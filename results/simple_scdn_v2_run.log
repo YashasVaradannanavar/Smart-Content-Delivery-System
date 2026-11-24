@@ -1,0 +1,240 @@
+
+==========================================================================
+STEP 0: build the topology
+==========================================================================
+  switch ports: h1=1, h2=2, h3=3, h4=4
+  h1 (client), s1 (OpenFlow 1.3 switch), h2/h3/h4 (servers) are up.
+  the client asks for 10.0.0.100, which all three servers own as a /32.
+
+==========================================================================
+STEP 1: the flow table is empty, so the switch drops everything
+==========================================================================
+  s1 has no rules and no controller.  Its fail mode is "secure", which
+  means unmatched packets are dropped instead of being forwarded.
+  The client will ask for the VIP and get nothing back.
+  --- OpenFlow rules currently in s1 (expected to be empty) ---
+  FAIL no-rules     rule->-   served_by=-    2506.6 ms  (TimeoutError)
+  -> no answer, exactly as expected: without rules there is no service.
+
+==========================================================================
+STEP 2: install the forwarding rules, traffic starts to flow
+==========================================================================
+  Two kinds of rule are added:
+    * one per host, so replies reach it by MAC address
+    * one that floods ARP, so hosts can find each other
+  Then the important one: VIP traffic is sent to h2.
+  OK   baseline     rule->h2  served_by=h2     11.6 ms
+  --- OpenFlow rules currently in s1 (after one request: the VIP rule has forwarded packets) ---
+     cookie=0x0, duration=1.019s, table=0, n_packets=6, n_bytes=481, priority=100,ip,nw_dst=10.0.0.100 actions=set_field:00:00:00:00:00:11->eth_dst,output:2
+     cookie=0x0, duration=1.199s, table=0, n_packets=6, n_bytes=603, priority=50,dl_dst=00:00:00:00:00:01 actions=output:1
+     cookie=0x0, duration=1.163s, table=0, n_packets=1, n_bytes=42, priority=50,dl_dst=00:00:00:00:00:11 actions=output:2
+     cookie=0x0, duration=1.136s, table=0, n_packets=0, n_bytes=0, priority=50,dl_dst=00:00:00:00:00:12 actions=output:3
+     cookie=0x0, duration=1.108s, table=0, n_packets=0, n_bytes=0, priority=50,dl_dst=00:00:00:00:00:13 actions=output:4
+     cookie=0x0, duration=1.081s, table=0, n_packets=1, n_bytes=42, priority=10,arp actions=FLOOD
+
+==========================================================================
+STEP 3: monitor the servers with a health check
+==========================================================================
+  From h1 we open a plain TCP connection to each server's own address
+  (10.0.0.11, 10.0.0.12, 10.0.0.13 - not the VIP).  A server that
+  answers is healthy, and its connect time is a latency sample we can
+  use for selection.  The VIP rule plays no part in this at all.
+  --- health check (baseline: all three servers should be UP) ---
+     h2 10.0.0.11  UP       1.6 ms
+     h3 10.0.0.12  UP       4.4 ms
+     h4 10.0.0.13  UP       4.2 ms
+
+==========================================================================
+STEP 4: select the server from health + latency, not round-robin
+==========================================================================
+  Policy: only healthy servers are candidates, and among them the one
+  with the lowest measured latency is chosen.  Each round probes,
+  decides, re-points the VIP rule, then sends one request, so the
+  reason for the choice is printed before the traffic moves.
+  (The three virtual links are identical, so their latencies differ
+  only by noise and the same server tends to win again and again.
+  That is the correct result for this policy; step 5 keeps the
+  round-robin pass precisely to show traffic can be spread too.)
+  --- health check (before request 1 of 6) ---
+     h2 10.0.0.11  UP       0.3 ms
+     h3 10.0.0.12  UP       0.2 ms
+     h4 10.0.0.13  UP       0.2 ms
+  decision: healthy=h2,h3,h4, lowest latency=h3 -> VIP -> h3
+  OK   smart        rule->h3  served_by=h3      7.9 ms
+  --- health check (before request 2 of 6) ---
+     h2 10.0.0.11  UP       0.3 ms
+     h3 10.0.0.12  UP       0.2 ms
+     h4 10.0.0.13  UP       0.2 ms
+  decision: healthy=h2,h3,h4, lowest latency=h3 -> VIP -> h3
+  OK   smart        rule->h3  served_by=h3      1.7 ms
+  --- health check (before request 3 of 6) ---
+     h2 10.0.0.11  UP       0.2 ms
+     h3 10.0.0.12  UP       0.1 ms
+     h4 10.0.0.13  UP       0.2 ms
+  decision: healthy=h2,h3,h4, lowest latency=h3 -> VIP -> h3
+  OK   smart        rule->h3  served_by=h3      1.8 ms
+  --- health check (before request 4 of 6) ---
+     h2 10.0.0.11  UP       0.2 ms
+     h3 10.0.0.12  UP       0.2 ms
+     h4 10.0.0.13  UP       0.1 ms
+  decision: healthy=h2,h3,h4, lowest latency=h4 -> VIP -> h4
+  OK   smart        rule->h4  served_by=h4      5.6 ms
+  --- health check (before request 5 of 6) ---
+     h2 10.0.0.11  UP       0.2 ms
+     h3 10.0.0.12  UP       0.1 ms
+     h4 10.0.0.13  UP       0.2 ms
+  decision: healthy=h2,h3,h4, lowest latency=h3 -> VIP -> h3
+  OK   smart        rule->h3  served_by=h3      1.8 ms
+  --- health check (before request 6 of 6) ---
+     h2 10.0.0.11  UP       0.2 ms
+     h3 10.0.0.12  UP       1.0 ms
+     h4 10.0.0.13  UP       0.3 ms
+  decision: healthy=h2,h3,h4, lowest latency=h2 -> VIP -> h2
+  OK   smart        rule->h2  served_by=h2      1.7 ms
+  --- OpenFlow rules currently in s1 (after latency-based selection) ---
+     cookie=0x0, duration=1.007s, table=0, n_packets=6, n_bytes=481, priority=100,ip,nw_dst=10.0.0.100 actions=set_field:00:00:00:00:00:11->eth_dst,output:2
+     cookie=0x0, duration=2.615s, table=0, n_packets=90, n_bytes=7485, priority=50,dl_dst=00:00:00:00:00:01 actions=output:1
+     cookie=0x0, duration=2.579s, table=0, n_packets=29, n_bytes=1946, priority=50,dl_dst=00:00:00:00:00:11 actions=output:2
+     cookie=0x0, duration=2.552s, table=0, n_packets=28, n_bytes=1904, priority=50,dl_dst=00:00:00:00:00:12 actions=output:3
+     cookie=0x0, duration=2.524s, table=0, n_packets=28, n_bytes=1904, priority=50,dl_dst=00:00:00:00:00:13 actions=output:4
+     cookie=0x0, duration=2.497s, table=0, n_packets=4, n_bytes=168, priority=10,arp actions=FLOOD
+
+==========================================================================
+STEP 5: load distribution over the three servers (round-robin baseline)
+==========================================================================
+  Before each request the VIP rule is re-pointed at the next server, so
+  the traffic really goes h2, h3, h4, h2, h3, h4 ...  The client always
+  asks for the same VIP; only the switch rule changes.
+  OK   distribution rule->h2  served_by=h2      1.8 ms
+  OK   distribution rule->h3  served_by=h3      1.7 ms
+  OK   distribution rule->h4  served_by=h4      1.7 ms
+  OK   distribution rule->h2  served_by=h2      1.5 ms
+  OK   distribution rule->h3  served_by=h3      6.4 ms
+  OK   distribution rule->h4  served_by=h4      1.6 ms
+  OK   distribution rule->h2  served_by=h2      1.7 ms
+  OK   distribution rule->h3  served_by=h3      1.7 ms
+  OK   distribution rule->h4  served_by=h4      1.6 ms
+  --- OpenFlow rules currently in s1 (after distribution) ---
+     cookie=0x0, duration=1.011s, table=0, n_packets=6, n_bytes=481, priority=100,ip,nw_dst=10.0.0.100 actions=set_field:00:00:00:00:00:13->eth_dst,output:4
+     cookie=0x0, duration=4.218s, table=0, n_packets=144, n_bytes=12912, priority=50,dl_dst=00:00:00:00:00:01 actions=output:1
+     cookie=0x0, duration=4.182s, table=0, n_packets=29, n_bytes=1946, priority=50,dl_dst=00:00:00:00:00:11 actions=output:2
+     cookie=0x0, duration=4.155s, table=0, n_packets=28, n_bytes=1904, priority=50,dl_dst=00:00:00:00:00:12 actions=output:3
+     cookie=0x0, duration=4.127s, table=0, n_packets=28, n_bytes=1904, priority=50,dl_dst=00:00:00:00:00:13 actions=output:4
+     cookie=0x0, duration=4.100s, table=0, n_packets=4, n_bytes=168, priority=10,arp actions=FLOOD
+
+==========================================================================
+STEP 6: throughput, one 8 MiB download per server
+==========================================================================
+  Same mechanism, bigger file: the VIP rule chooses who sends it.
+  The numbers are real bytes per second, but between virtual hosts they
+  mostly measure memory speed rather than a real network link.
+  OK   rule->h2 served_by=h2 8388621 bytes in   28.0 ms =  299.4 MB/s
+  OK   rule->h3 served_by=h3 8388621 bytes in   43.3 ms =  193.7 MB/s
+  OK   rule->h4 served_by=h4 8388621 bytes in   26.1 ms =  322.1 MB/s
+
+==========================================================================
+STEP 7: a path failure - unplug h3's link at the switch
+==========================================================================
+  h3's web server keeps running and its address is unchanged; only the
+  cable is pulled.  Compare the error with step 8: a broken path cannot
+  answer at all, so the request times out instead of being refused.
+  FAIL path-failure rule->h3  served_by=-    2503.1 ms  (TimeoutError)
+  --- health check (h3 should be DOWN: its path is gone) ---
+     h2 10.0.0.11  UP       0.5 ms
+     h3 10.0.0.12  DOWN   401.2 ms
+     h4 10.0.0.13  UP       0.5 ms
+  the policy drops h3 and keeps serving on the other two:
+  OK   path-failure rule->h4  served_by=h4      3.2 ms
+  OK   path-failure rule->h4  served_by=h4      1.6 ms
+  OK   path-failure rule->h4  served_by=h4      2.0 ms
+  OK   path-failure rule->h4  served_by=h4      2.1 ms
+  plug the cable back in:
+  --- health check (h3 should be UP again) ---
+     h2 10.0.0.11  UP       0.3 ms
+     h3 10.0.0.12  UP       0.7 ms
+     h4 10.0.0.13  UP       0.2 ms
+  OK   path-back    rule->h3  served_by=h3      1.9 ms
+
+==========================================================================
+STEP 8: a server failure - kill h3's web server
+==========================================================================
+  This time the path is fine and the process dies.  On purpose the VIP
+  rule is left pointing at h3, so the next request must fail: that is
+  what a dead server looks like to a user.
+  FAIL failure      rule->h3  served_by=-       0.4 ms  (ConnectionRefusedError)
+  -> refused, not timed out: the link is fine, the process is gone.
+  Now the health check runs.  h3 refuses the probe, so it is marked
+  DOWN.  Nothing in the code mentions h3: the exclusion comes from the
+  measurement.
+  --- health check (h3 should be DOWN) ---
+     h2 10.0.0.11  UP       0.3 ms
+     h3 10.0.0.12  DOWN     0.1 ms
+     h4 10.0.0.13  UP       9.4 ms
+
+==========================================================================
+STEP 9: availability - keep serving while h3 is unhealthy
+==========================================================================
+  Requests keep arriving while h3 is dead.  Because the policy only
+  offers healthy servers, every request is served.  The client is never
+  told anything and still asks for the same VIP address.
+  OK   availability rule->h2  served_by=h2      1.8 ms
+  OK   availability rule->h2  served_by=h2      1.6 ms
+  OK   availability rule->h2  served_by=h2      1.6 ms
+  OK   availability rule->h2  served_by=h2      1.6 ms
+  OK   availability rule->h2  served_by=h2      1.7 ms
+  OK   availability rule->h2  served_by=h2      1.9 ms
+  --- OpenFlow rules currently in s1 (while h3 is dead the VIP rule only ever points at h2 or h4) ---
+     cookie=0x0, duration=1.009s, table=0, n_packets=6, n_bytes=481, priority=100,ip,nw_dst=10.0.0.100 actions=set_field:00:00:00:00:00:11->eth_dst,output:2
+     cookie=0x0, duration=12.791s, table=0, n_packets=718, n_bytes=25219607, priority=50,dl_dst=00:00:00:00:00:01 actions=output:1
+     cookie=0x0, duration=12.755s, table=0, n_packets=41, n_bytes=2762, priority=50,dl_dst=00:00:00:00:00:11 actions=output:2
+     cookie=0x0, duration=12.728s, table=0, n_packets=35, n_bytes=2366, priority=50,dl_dst=00:00:00:00:00:12 actions=output:3
+     cookie=0x0, duration=12.700s, table=0, n_packets=40, n_bytes=2720, priority=50,dl_dst=00:00:00:00:00:13 actions=output:4
+     cookie=0x0, duration=12.673s, table=0, n_packets=5, n_bytes=210, priority=10,arp actions=FLOOD
+
+==========================================================================
+STEP 10: recovery - restart h3 and let the policy find it again
+==========================================================================
+  h3's web server is started again.  Nothing tells the selection logic
+  about it: the next health check simply sees h3 answering, so h3 is a
+  candidate again and is chosen like any other server.
+  --- health check (h3 should be UP again) ---
+     h2 10.0.0.11  UP       0.3 ms
+     h3 10.0.0.12  UP       0.2 ms
+     h4 10.0.0.13  UP       0.2 ms
+  OK   recovery     rule->h3  served_by=h3     28.6 ms
+  OK   recovery     rule->h3  served_by=h3      2.6 ms
+  OK   recovery     rule->h3  served_by=h3      2.2 ms
+  OK   recovery     rule->h3  served_by=h3      2.0 ms
+  OK   recovery     rule->h3  served_by=h3      2.9 ms
+  OK   recovery     rule->h3  served_by=h3      2.3 ms
+
+==========================================================================
+SUMMARY
+==========================================================================
+  no-rules      1 request(s),  0 succeeded, mean     0.0 ms
+  baseline      1 request(s),  1 succeeded, mean    11.6 ms
+  smart         6 request(s),  6 succeeded, mean     3.4 ms
+  distribution  9 request(s),  9 succeeded, mean     2.2 ms
+  throughput    3 request(s),  3 succeeded, mean    32.5 ms
+  path-failure  5 request(s),  4 succeeded, mean     2.2 ms
+  path-back     1 request(s),  1 succeeded, mean     1.9 ms
+  failure       1 request(s),  0 succeeded, mean     0.0 ms
+  availability  6 request(s),  6 succeeded, mean     1.7 ms
+  recovery      6 request(s),  6 succeeded, mean     6.8 ms
+
+  requests answered by each server:
+     h2 12
+     h3 15
+     h4  9
+
+  throughput:
+     h2  299.4 MB/s  (8388621 bytes)
+     h3  193.7 MB/s  (8388621 bytes)
+     h4  322.1 MB/s  (8388621 bytes)
+
+  independent check, from each web server's own access log:
+     h2 served 12 requests
+     h3 served 15 requests
+     h4 served  9 requests
+
+  results written to /home/<user>/smart-content-delivery/results/simple_scdn_v2_results.csv

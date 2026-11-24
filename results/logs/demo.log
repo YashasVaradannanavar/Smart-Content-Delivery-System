@@ -1,0 +1,110 @@
+topology ready: s1 + h1..h4, management bridge m1
+switch ports: {'h1': 1, 'h2': 2, 'h3': 3, 'h4': 4}
+
+==============================================================================
+PHASE 0 - topology and controller state
+==============================================================================
+[controller] switch=connected active=None | h2:up(load=0,rtt=3.8ms)  h3:up(load=0,rtt=3.4ms)  h4:up(load=0,rtt=2.8ms)
+[controller] last decision: 
+[topology] switch ports: {'h1': 1, 'h2': 2, 'h3': 3, 'h4': 4}
+[topology] management plane: 10.255.0.254 <-> 10.255.0.11-13 (no OpenFlow)
+
+==============================================================================
+PHASE 1 - baseline: 20 sequential requests through the virtual IP
+==============================================================================
+client: 20 request(s) to http://10.0.0.100:8080/content/small.txt (concurrency 1)
+
+  phase            : baseline
+  file             : small.txt
+  requests         : 20 (20 ok, 0 failed)
+  concurrency      : 1
+  wall clock       : 3.85 s
+  latency ms       : mean 192.28  median 198.95  min 154.89  max 212.62
+  throughput Mbps  : mean 238.65  median 244.50
+  served by        : h2=9, h3=5, h4=6
+  latency p95 ms   : 210.84
+[result] served by: h2=9, h3=5, h4=6
+[flows:baseline] 45 rules in the table, per server: {'h2': 19, 'h3': 11, 'h4': 13}
+
+==============================================================================
+PHASE 2 - load: 12 requests at concurrency 3 (servers appear busy)
+==============================================================================
+client: 12 request(s) to http://10.0.0.100:8080/content/small.txt (concurrency 3)
+
+  phase            : load
+  file             : small.txt
+  requests         : 12 (12 ok, 0 failed)
+  concurrency      : 3
+  wall clock       : 0.89 s
+  latency ms       : mean 200.70  median 200.66  min 157.14  max 241.89
+  throughput Mbps  : mean 221.47  median 242.82
+  served by        : h2=5, h3=4, h4=3
+  latency p95 ms   : 240.35
+[result] served by: h2=5, h3=4, h4=3
+[flows:load] 69 rules in the table, per server: {'h2': 29, 'h3': 19, 'h4': 19}
+
+==============================================================================
+PHASE 3 - throughput: 5 transfers of large.bin
+==============================================================================
+client: 5 request(s) to http://10.0.0.100:8080/content/large.bin (concurrency 1)
+
+  phase            : throughput
+  file             : large.bin
+  requests         : 5 (5 ok, 0 failed)
+  concurrency      : 1
+  wall clock       : 1.16 s
+  latency ms       : mean 230.39  median 238.57  min 185.73  max 260.51
+  throughput Mbps  : mean 1216.25  median 1232.86
+  served by        : h2=2, h3=2, h4=1
+  latency p95 ms   : 260.51
+[flows:throughput] 79 rules in the table, per server: {'h2': 33, 'h3': 23, 'h4': 21}
+
+==============================================================================
+PHASE 4 - failure: kill a server and watch the switch stop using it
+==============================================================================
+[flows:before_failure] 79 rules in the table, per server: {'h2': 33, 'h3': 23, 'h4': 21}
+[failure] killing content server on h2
+[failure] controller detected the outage: True
+[flows:after_failure] 46 rules in the table, per server: {'h2': 0, 'h3': 23, 'h4': 21}
+[failure] flows for h2: 33 before, 0 after
+[controller] switch=connected active=h2 | h2:DOWN(load=1,rtt=2.0ms)  h3:up(load=0,rtt=2.4ms)  h4:up(load=0,rtt=2.3ms)
+[controller] last decision: keep h2 for source port 39378: connection already steered
+client: 10 request(s) to http://10.0.0.100:8080/content/small.txt (concurrency 1)
+
+  phase            : failover
+  file             : small.txt
+  requests         : 10 (10 ok, 0 failed)
+  concurrency      : 1
+  wall clock       : 2.00 s
+  latency ms       : mean 199.54  median 199.71  min 196.40  max 203.16
+  throughput Mbps  : mean 244.26  median 250.43
+  served by        : h3=5, h4=5
+  latency p95 ms   : 203.16
+[result] served by: h3=5, h4=5
+[flows:failover] 66 rules in the table, per server: {'h2': 0, 'h3': 33, 'h4': 31}
+
+==============================================================================
+PHASE 5 - recovery: restart h2 and let it rejoin
+==============================================================================
+[recovery] server process up: True, controller sees it healthy: True
+client: 10 request(s) to http://10.0.0.100:8080/content/small.txt (concurrency 1)
+
+  phase            : recovery
+  file             : small.txt
+  requests         : 10 (10 ok, 0 failed)
+  concurrency      : 1
+  wall clock       : 1.89 s
+  latency ms       : mean 187.26  median 198.63  min 159.00  max 200.15
+  throughput Mbps  : mean 219.22  median 231.59
+  served by        : h2=4, h3=3, h4=3
+  latency p95 ms   : 200.15
+[result] served by: h2=4, h3=3, h4=3
+[flows:recovery] 86 rules in the table, per server: {'h2': 8, 'h3': 39, 'h4': 37}
+[controller] switch=connected active=h3 | h2:up(load=1,rtt=2.6ms)  h3:up(load=0,rtt=2.2ms)  h4:up(load=0,rtt=2.3ms)
+[controller] last decision: keep h3 for source port 37038: connection already steered
+
+==============================================================================
+DEMONSTRATION RESULT
+==============================================================================
+All phases completed: selection, load spreading, measured throughput,
+failure detection, failover, and recovery all produced real evidence.

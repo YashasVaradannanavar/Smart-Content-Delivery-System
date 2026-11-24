@@ -1,0 +1,64 @@
+{
+  "controller": {
+    "uptime_s": 2.58,
+    "of_port": 6653,
+    "api_port": 9100
+  },
+  "switch": {
+    "connected": true,
+    "dpid": "0000000000000001",
+    "ports": {
+      "h1": 1,
+      "h2": 2,
+      "h3": 3,
+      "h4": 4
+    }
+  },
+  "vip": "10.0.0.100",
+  "active_host": null,
+  "servers": {
+    "h2": {
+      "host": "h2",
+      "ip": "10.0.0.11",
+      "healthy": true,
+      "failures": 0,
+      "rtt_ms": 3.79,
+      "active": 0,
+      "total": 0,
+      "last_error": "",
+      "ever_seen": true
+    },
+    "h3": {
+      "host": "h3",
+      "ip": "10.0.0.12",
+      "healthy": true,
+      "failures": 0,
+      "rtt_ms": 3.385,
+      "active": 0,
+      "total": 0,
+      "last_error": "",
+      "ever_seen": true
+    },
+    "h4": {
+      "host": "h4",
+      "ip": "10.0.0.13",
+      "healthy": true,
+      "failures": 0,
+      "rtt_ms": 2.836,
+      "active": 0,
+      "total": 0,
+      "last_error": "",
+      "ever_seen": true
+    }
+  },
+  "decisions": [],
+  "last_reason": "",
+  "counters": {
+    "packet_ins": 0,
+    "arp_replies": 0,
+    "connections_steered": 0,
+    "flows_installed": 3,
+    "flows_deleted": 0,
+    "failovers": 0
+  }
+}

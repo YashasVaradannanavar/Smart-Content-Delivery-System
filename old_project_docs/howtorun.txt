@@ -1,0 +1,487 @@
+================================================================================
+ SMART CONTENT DELIVERY SYSTEM - HOW TO RUN IT
+ Windows 10/11 + Ubuntu on WSL2, started from Freebuff
+================================================================================
+
+This file was checked against the real project files (run_demo.sh, topo.py,
+demo.py, config.py, scripts/check_env.sh, DEMO.md, README.txt) and the launch
+command was actually executed successfully before being written down.
+
+Project location inside Ubuntu:
+
+    /home/<user>/smart-content-delivery
+
+From Windows you can also see it in Explorer at:
+
+    \wsl.localhost\Ubuntu\home\<user>\smart-content-delivery
+
+
+--------------------------------------------------------------------------------
+1. THE EXACT COMMAND
+--------------------------------------------------------------------------------
+
+Open the Freebuff terminal (it is Git Bash on Windows) and paste this single
+line. There is no cd, no "wsl" shell, and no password prompt:
+
+    wsl.exe -u root -d Ubuntu -- bash -lc "cd /home/<user>/smart-content-delivery && ./run_demo.sh"
+
+That path and command come from the project itself: run_demo.sh prints it in
+its header, README.txt section 4 documents it, DEMO.md repeats it.
+
+Expected duration: about 1-2 minutes.
+Success is the final line:  DEMONSTRATION COMPLETED SUCCESSFULLY
+and exit code 0.
+
+Inside Ubuntu you can use the equivalent instead:
+
+    cd /home/<user>/smart-content-delivery
+    sudo ./run_demo.sh
+
+
+--------------------------------------------------------------------------------
+2. DO YOU NEED TO OPEN UBUNTU OR INSTALL ANYTHING?
+--------------------------------------------------------------------------------
+
+No.
+
+  * No separate Ubuntu window. "wsl.exe" starts the Ubuntu distro on demand.
+    ("wsl -l -v" shows Ubuntu, version 2, state Stopped while idle; the first
+    command simply wakes it up, taking a few extra seconds.)
+
+  * No password. "-u root" runs the command as root, which Mininet requires
+    because it creates network namespaces. That is why the command does not
+    use sudo from Windows.
+
+  * Nothing to install. The environment was verified with:
+
+        wsl.exe -u root -d Ubuntu -- bash -lc "cd /home/<user>/smart-content-delivery && ./scripts/check_env.sh"
+
+    which reported:
+
+        running as root          OK (required by Mininet)
+        python3                  OK (Python 3.14.4)
+        mininet python package   OK (/usr/lib/python3/dist-packages/mininet)
+        mn command               OK (/usr/bin/mn)
+        ovs-vsctl                OK (Open vSwitch 3.7.1)
+        ovs-ofctl                OK (Open vSwitch 3.7.1)
+        openvswitch daemon       OK (reachable)
+        tcp port 6653            OK (free)
+        tcp port 9100            OK (free)
+        sample content           OK (small.txt + large.bin)
+        unit tests: Ran 28 tests ... OK
+
+    There is NO requirements.txt and no pip install step. The project uses
+    only the Python standard library; the OpenFlow 1.3 layer is implemented in
+    controller/of13.py with the struct module. The .venv/ folder in the project
+    is not used by any command - run_demo.sh calls the system python3.
+
+If you run ./run_demo.sh without root it refuses and prints the correct
+command instead; it never asks for a password itself.
+
+
+--------------------------------------------------------------------------------
+3. WHAT HAPPENS WHEN YOU RUN IT
+--------------------------------------------------------------------------------
+
+run_demo.sh performs four numbered steps.
+
+== 1/4 generating sample content ==
+    scripts/make_content.py ensures servers/content/small.txt (4 KB) and
+    servers/content/large.bin (4 MB) exist. Existing files are kept.
+
+== 2/4 starting the OpenFlow 1.3 controller ==
+    Runs "python3 -m controller.sdn_controller" in the background. This is the
+    project's own controller (not Ryu/OS-Ken). It listens on TCP 6653 for the
+    switch and exposes an HTTP control API on 127.0.0.1:9100 (/status,
+    /healthz, /ports). The script waits up to 15 s for /healthz; if it never
+    answers it prints "controller did not start" plus the log tail and stops.
+
+== 3/4 building the topology and running the demonstration ==
+    Runs "python3 -m topo --delay-ms 150", which:
+
+      * builds the Mininet network:
+            s1  Open vSwitch bridge, OpenFlow 1.3
+                h1  client         10.0.0.1    switch port 1
+                h2  content server 10.0.0.11   switch port 2
+                h3  content server 10.0.0.12   switch port 3
+                h4  content server 10.0.0.13   switch port 4
+            VIP 10.0.0.100 (virtual IP presented to the client; no real host)
+
+      * builds the out-of-band management network m1, a plain Linux bridge with
+        no OpenFlow on it: 10.255.0.254 (controller side) <-> 10.255.0.11-13,
+        each server reached through a veth pair moved into its namespace. It
+        then pings every management address before continuing, so health probes
+        can never be broken by the forwarding rules being changed.
+
+      * publishes the switch port map to the controller (POST /ports), then
+        starts a content server inside each server host:
+
+            nohup python3 servers/content_server.py --name hX
+                  --data-ip 10.0.0.1X --port 8080 --delay-ms 150
+
+        waiting for /health on the management plane before moving on.
+
+      * runs five phases, driving the client INSIDE h1's namespace:
+
+            python3 client/client.py --phase <phase> --requests N ...
+
+        The client only ever connects to http://10.0.0.100:8080, so which
+        physical server answers is decided entirely by the controller and
+        enforced by OpenFlow rules in s1. Between phases it dumps the flow table
+        (ovs-ofctl -O OpenFlow13 dump-flows s1) into results/logs/flows_*.txt.
+
+      * then stops the servers, deletes m1 and stops Mininet in its finally
+        block, even if a phase failed.
+
+== 4/4 writing the report ==
+    scripts/summarize.py writes results/summary.md; scripts/make_charts.py
+    writes the three SVG charts.
+
+A trap (cleanup) runs on EXIT/INT/TERM: it kills the controller, deletes m1 and
+kills leftover content servers, so Ctrl+C also shuts down cleanly.
+
+
+--------------------------------------------------------------------------------
+4. HOW TO DEMONSTRATE SELECTION, LOAD, FAILOVER AND RECOVERY
+--------------------------------------------------------------------------------
+
+A. AUTOMATED - the demo already performs all four
+
+   Watch the phase banners during the run:
+
+   Server selection (dynamic choice with a logged reason)
+       PHASE 1 - baseline: 20 sequential requests through the virtual IP
+       Look for:  served by: h2=9, h3=6, h4=5
+       and:       [flows:baseline] 45 rules in the table, per server: {...}
+       Every request opens a new TCP connection, so every request is an
+       independent decision. The dumped rules show the decision itself:
+           priority=300,tcp,in_port=1,nw_dst=10.0.0.100,tp_dst=8080
+               actions=set_field:<server mac>->eth_dst,
+                       set_field:<server ip>->ip_dst,output:<port>
+       The reason for each decision is in results/logs/controller_events.jsonl.
+
+   Load handling
+       PHASE 2 - load: 12 requests at concurrency 3
+       Look for:  requests : 12 (12 ok, 0 failed), served by: h2=4, h3=4, h4=4
+       The 1 s health poll cannot see a burst, so the controller also counts
+       connections it steered in the last half second and spreads them one per
+       server instead of piling all three onto the idlest one.
+
+   Automatic failover
+       PHASE 4 - failure: kill a server and watch the switch stop using it
+       Look for:  [failure] killing content server on <host>
+                  [failure] controller detected the outage: True
+                  [failure] flows for <host>: 25 before, 0 after
+                  served by: h2=7, h4=3
+       Two failed probes in a row mark the server down; the controller sends one
+       flow-mod delete with that server's cookie mask, removing every rule that
+       points at it. No client request fails.
+       NOTE: the victim is whichever server was the active_host, so it varies
+       per run (h3 in the verified run, h4 in DEMO.md's example).
+
+   Recovery
+       PHASE 5 - recovery: restart <host> and let it rejoin
+       Look for:  [recovery] server process up: True, controller sees it healthy: True
+                  served by: h2=4, h3=3, h4=3
+       The restarted server answers probes again, re-enters the pool and takes
+       traffic with no client-visible change.
+
+B. WATCH IT LIVE from a second Freebuff terminal
+
+   Flow table summary (decodes the rule cookies into per-server counts):
+
+       wsl.exe -u root -d Ubuntu -- bash -lc "cd /home/<user>/smart-content-delivery && ./scripts/show_flows.sh --short"
+
+   Drop --short for the summary plus the full table. Run it during the demo and
+   you can watch the killed server's rules reach 0.
+
+   Controller state (inside WSL, where the control API listens):
+
+       wsl.exe -u root -d Ubuntu -- bash -lc "curl -s http://127.0.0.1:9100/status | python3 -m json.tool"
+
+C. MANUAL / HANDS-ON (optional)
+
+   run_demo.sh always runs the scripted demo, so start the pieces yourself.
+
+   Terminal 1 - the controller:
+
+       wsl.exe -u root -d Ubuntu -- bash -lc "cd /home/<user>/smart-content-delivery && python3 -m controller.sdn_controller"
+
+   Terminal 2 - the topology and the Mininet CLI:
+
+       wsl.exe -u root -d Ubuntu -- bash -lc "cd /home/<user>/smart-content-delivery && python3 -m topo --interactive"
+
+   At the mininet> prompt:
+
+       mininet> h1 python3 client/client.py --phase manual --requests 3
+       mininet> h1 curl -s -D - -o /dev/null http://10.0.0.100:8080/content/small.txt
+       mininet> h4 pkill -f content_server.py
+       mininet> h1 python3 client/client.py --phase manual-after-failure --requests 5
+       mininet> exit
+
+   Verified: the 3 manual requests went to h2, h3 and h4 in turn. In this mode
+   the client's printed summary is not echoed to the Mininet prompt; the
+   measurements are written to the CSV (use --csv to pick the file), which is
+   why the scripted demo is the better thing to present.
+
+D. OPTIONAL HARD PROOF (automated acceptance test, about 3 minutes)
+
+       wsl.exe -u root -d Ubuntu -- bash -lc "cd /home/<user>/smart-content-delivery && ./tests/test_e2e.sh"
+
+   It re-runs the demonstration and then asserts on the artifacts: every phase
+   present with zero failures, at least two servers used under load, the killed
+   server absent from the failover rows, zero flows left for it, the restarted
+   server used again, and three valid SVG charts.
+
+E. UNIT TESTS (no root needed, instant)
+
+       wsl.exe -d Ubuntu -- bash -lc "cd /home/<user>/smart-content-delivery && python3 -m unittest discover -s tests -q"
+
+   28 tests, all passing.
+
+
+--------------------------------------------------------------------------------
+5. WHERE RESULTS, LOGS AND SUMMARIES ARE SAVED
+--------------------------------------------------------------------------------
+
+Everything is written under the project's results/ directory.
+
+  WSL path     : /home/<user>/smart-content-delivery/results/
+  Windows path : \wsl.localhost\Ubuntu\home\<user>\smart-content-delivery\results\
+                 (paste into Explorer's address bar while Ubuntu is running;
+                 this path was verified to open from Windows)
+
+  results/results.csv
+      One row per request, every phase:
+      iso_time,phase,seq,ok,server_host,server_ip,status,latency_ms,ttfb_ms,
+      bytes,throughput_mbps,error
+
+  results/summary.md
+      Per-phase table, per-server throughput table, controller activity counts,
+      the exact measurement definitions, and the honest limitations.
+
+  results/charts/latency_by_phase.svg
+  results/charts/throughput_by_server.svg
+  results/charts/requests_by_server.svg
+      Plain SVG, no plotting library; open them in any browser.
+
+  results/logs/controller.log
+      Human-readable controller log: switch connect, probes, each selection and
+      its reason, flow changes, server up/down, errors.
+
+  results/logs/controller_events.jsonl
+      The same activity as machine-readable events (startup, selection + reason,
+      flow changes, server up/down, failover).
+
+  results/logs/flows_baseline.txt, flows_load.txt, flows_throughput.txt,
+  flows_before_failure.txt, flows_after_failure.txt, flows_failover.txt,
+  flows_recovery.txt
+      ovs-ofctl dumps of the switch, one per phase. The before/after failure
+      pair is the failover proof: the dead server's rules go 25 -> 0.
+
+  results/logs/server_h2.log, server_h3.log, server_h4.log
+      Per-server logs (requests served and /stats polling).
+
+  results/logs/status_initial.json, status_after_failure.json, status_final.json
+      Controller state snapshots taken by the demo.
+
+  results/logs/demo.log
+      The console output of the run (tee'd by run_demo.sh).
+
+Two practical notes:
+
+  * Every run clears and overwrites these files (results.csv is deleted, the
+    logs are truncated). Keep a copy of a run if you need to compare, e.g.:
+
+        wsl.exe -u root -d Ubuntu -- bash -lc "cd /home/<user>/smart-content-delivery && cp -r results results_backup"
+
+  * Because the demo runs as root, the files under results/ are root-owned but
+    world-readable: you can open them from Explorer. Deleting or editing them
+    from Linux should be done through the same root command.
+
+Optional - copy the whole results folder onto Windows (use a folder that
+exists):
+
+    wsl.exe -u root -d Ubuntu -- bash -lc "cp -r /home/<user>/smart-content-delivery/results /mnt/c/Users/<user>/Desktop/scd-results"
+
+
+--------------------------------------------------------------------------------
+6. STOPPING SAFELY AND CLEANING UP THE NETWORK
+--------------------------------------------------------------------------------
+
+NORMAL STOP
+    Press Ctrl+C in the terminal running the demo, or just let it finish.
+    Either way:
+      * the EXIT/INT/TERM trap in run_demo.sh kills the controller, deletes the
+        m1 bridge and kills leftover content servers;
+      * topo.py's finally block stops the content servers, deletes m1 and stops
+        Mininet, which removes s1 and the host links.
+
+    After the verified run the machine was clean:
+
+        Device "m1" does not exist.
+        s1 gone
+        6653 and 9100 free
+        no controller or content_server processes
+
+IF YOU INTERRUPTED IT, CLOSED THE TERMINAL, OR SEE "controller did not start"
+
+    Run this once:
+
+        wsl.exe -u root -d Ubuntu -- bash -lc "pkill -f controller.sdn_controller; pkill -f content_server.py; ip link del m1; ovs-vsctl --if-exists del-br s1; echo cleaned"
+
+    The demonstration is idempotent: it recreates everything it needs on the
+    next run and also clears stale bridge/interface state itself.
+
+CHECK THAT NOTHING IS LEFT RUNNING
+
+        wsl.exe -u root -d Ubuntu -- bash -lc "ip link show m1 2>&1 | head -1; ovs-vsctl br-exists s1 && echo 's1 EXISTS' || echo 's1 gone'; pgrep -af 'sdn_controller|content_server' || echo 'no procs'; ss -ltn | grep -E ':6653|:9100' || echo 'ports free'"
+
+STOP THE WHOLE DISTRO (last resort; uninstalls nothing)
+
+        wsl.exe --terminate Ubuntu
+
+No systemd service, firewall rule or Windows setting is changed. Mininet only
+creates network namespaces, an Open vSwitch bridge and temporary veth pairs,
+all of which are removed by the shutdown above.
+
+--------------------------------------------------------------------------------
+7. WHAT CORRECT OUTPUT LOOKS LIKE
+--------------------------------------------------------------------------------
+
+Real output of the verified run (trimmed):
+
+    == 1/4 generating sample content ==
+    keeping /home/<user>/smart-content-delivery/servers/content/small.txt (4096 bytes)
+    keeping /home/<user>/smart-content-delivery/servers/content/large.bin (4194304 bytes)
+    == 2/4 starting the OpenFlow 1.3 controller ==
+    == 3/4 building the topology and running the demonstration ==
+    topology ready: s1 + h1..h4, management bridge m1
+    switch ports: {'h1': 1, 'h2': 2, 'h3': 3, 'h4': 4}
+
+    PHASE 0 - topology and controller state
+    [controller] switch=connected active=None | h2:up(load=0,rtt=1.7ms)  h3:up(...)  h4:up(...)
+    [topology] management plane: 10.255.0.254 <-> 10.255.0.11-13 (no OpenFlow)
+
+    PHASE 1 - baseline: 20 sequential requests through the virtual IP
+      requests         : 20 (20 ok, 0 failed)
+      latency ms       : mean 191.33  median 196.25  min 154.99  max 202.23
+      throughput Mbps  : mean 232.86  median 239.47
+      served by        : h2=9, h3=6, h4=5
+    [flows:baseline] 45 rules in the table, per server: {'h2': 19, 'h3': 13, 'h4': 11}
+
+    PHASE 2 - load: 12 requests at concurrency 3 (servers appear busy)
+      requests         : 12 (12 ok, 0 failed)
+      wall clock       : 0.84 s
+      served by        : h2=4, h3=4, h4=4
+
+    PHASE 3 - throughput: 5 transfers of large.bin
+      requests         : 5 (5 ok, 0 failed)
+      throughput Mbps  : mean 1540.79  median 1635.14
+      served by        : h2=2, h3=2, h4=1
+
+    PHASE 4 - failure: kill a server and watch the switch stop using it
+    [flows:before_failure] 79 rules in the table, per server: {'h2': 31, 'h3': 25, 'h4': 21}
+    [failure] killing content server on h3
+    [failure] controller detected the outage: True
+    [flows:after_failure] 54 rules in the table, per server: {'h2': 31, 'h3': 0, 'h4': 21}
+    [failure] flows for h3: 25 before, 0 after
+    [controller] switch=connected active=h3 | h2:up(...)  h3:DOWN(...)  h4:up(...)
+    [result] served by: h2=7, h4=3
+
+    PHASE 5 - recovery: restart h3 and let it rejoin
+    [recovery] server process up: True, controller sees it healthy: True
+    [result] served by: h2=4, h3=3, h4=3
+
+    DEMONSTRATION RESULT
+    All phases completed: selection, load spreading, measured throughput,
+    failure detection, failover, and recovery all produced real evidence.
+
+    == 4/4 writing the report ==
+    | Phase | Requests | OK | Failed | Mean latency (ms) | p95 latency (ms) | Mean throughput (Mbps) | Served by |
+    | baseline | 20 | 20 | 0 | 191.33 | 200.89 | 232.86 | h2=9, h3=6, h4=5 |
+    | load | 12 | 12 | 0 | 192.23 | 202.55 | 203.29 | h2=4, h3=4, h4=4 |
+    | throughput | 5 | 5 | 0 | 230.88 | 242.23 | 1540.79 | h2=2, h3=2, h4=1 |
+    | failover | 10 | 10 | 0 | 198.64 | 202.22 | 202.63 | h2=7, h4=3 |
+    | recovery | 10 | 10 | 0 | 196.76 | 200.14 | 249.57 | h2=4, h3=3, h4=3 |
+
+    controller: 158 selection decisions, 1 failure detections, 1 recoveries, 1 failovers
+    written: /home/<user>/smart-content-delivery/results/summary.md
+    wrote .../results/charts/latency_by_phase.svg
+    wrote .../results/charts/throughput_by_server.svg
+    wrote .../results/charts/requests_by_server.svg
+
+    DEMONSTRATION COMPLETED SUCCESSFULLY
+    == shutting down ==
+
+PASS CRITERIA
+
+  * every phase ends with 0 failed requests;
+  * "served by" lists at least two servers in the baseline and load phases;
+  * in PHASE 4 the killed server's rule count goes N -> 0 and it never appears
+    in the failover rows;
+  * in PHASE 5 the restarted server appears in the recovery rows again;
+  * the last line is DEMONSTRATION COMPLETED SUCCESSFULLY and the exit code is 0;
+  * afterwards there is no s1 or m1 bridge, no controller/server process, and
+    ports 6653 and 9100 are free.
+
+Exact latencies and counts vary from run to run. Latency is dominated by the
+deliberate 150 ms simulated server delay (--delay-ms 150), which exists so that
+concurrent requests overlap and load becomes observable. The distributions and
+the zero-failure requirement are what matter, not the absolute numbers. The
+throughput figures are limited by the virtual Ethernet paths inside WSL2: they
+are meaningful comparatively (server vs server, before vs after a failure), not
+as internet-grade bandwidth.
+
+The exit code is the quickest check when you run it unattended:
+
+    wsl.exe -u root -d Ubuntu -- bash -lc "cd /home/<user>/smart-content-delivery && ./run_demo.sh"; echo "exit=$?"
+
+
+--------------------------------------------------------------------------------
+8. IF SOMETHING GOES WRONG (short troubleshooting list)
+--------------------------------------------------------------------------------
+
+  "must run as root"
+      Mininet needs namespaces. Use the wsl.exe -u root command. Do not try to
+      work around it.
+
+  "controller did not start"
+      A previous run is probably still holding port 6653 or 9100. Run the
+      cleanup command from section 6, then start again.
+
+  "switch is not connected to the controller"
+      Check results/logs/controller.log. Confirm OpenFlow 1.3 is enabled:
+
+          sudo ovs-vsctl get bridge s1 protocols
+
+  Requests fail with "No route to host"
+      ARP is failing: the controller's ARP responder or the ARP rule is not
+      working. Run ./scripts/show_flows.sh --short and check that the ARP rule's
+      packet counter is increasing.
+
+  Requests fail with "timed out"
+      The SYN reached the switch but nothing answered. Check the per-connection
+      rules and that the server is listening:
+
+          sudo ovs-ofctl -O OpenFlow13 dump-flows s1 | grep priority=300
+
+  Leftover state after a crash
+      Run the cleanup command from section 6. The demo is idempotent and also
+      clears stale bridge/interface state on start.
+
+  Charts missing
+      make_charts.py only draws when there is at least one successful request.
+      Run the demonstration first.
+
+  WSL2 notes
+      Mininet works in WSL2 because it uses namespaces, not virtual machines,
+      and the in-kernel Open vSwitch datapath is used here. Nothing needs
+      systemd. Root is reached with "wsl.exe -u root", without a password.
+
+Full troubleshooting is in README.txt section 16; the viva runbook is DEMO.md.
+
+
+================================================================================
+ END OF FILE
+================================================================================

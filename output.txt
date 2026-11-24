@@ -1,0 +1,370 @@
+
+==========================================================================
+STEP 0: build the topology
+==========================================================================
+  switch ports: h1=1, h2=2, h3=3, h4=4
+  h1 (client), s1 (OpenFlow 1.3 switch), h2/h3/h4 (servers) are up.
+  the client asks for 10.0.0.100, which all three servers own as a /32.
+
+  --- how to read the numbers in this output -------------------------
+  request time      measured inside h1, from the start of the TCP connect
+                    to the last byte of the body.  It includes the server
+                    building the reply, so it is request completion time and
+                    NOT the network round trip time (RTT).
+  probe time        one TCP connect to the server's OWN address, no data.
+                    The probe timeout is 400 ms, so a DOWN probe near 400 ms
+                    means "no packets came back" (broken path), while a DOWN
+                    probe near 0 ms means "refused" (the host is fine, but
+                    nothing is listening on port 8080).
+  throughput        MB/s = bytes received / transfer time, with 1 MB =
+                    1,000,000 bytes (decimal MB, not MiB).
+  rule->hX          the server the VIP rule pointed at before the request.
+  served_by=hX      the server that really answered, read from the body.
+                    These two must match; a mismatch is a real bug.
+  OK / FAIL         an HTTP 200 arrived / no usable answer arrived.
+  2.5 s timeout     the CLIENT gave up.  That number is the client's own
+                    patience, not the server's speed.
+  link settle       a fixed 1500 ms pause after unplug / replug, so that
+                    Open vSwitch notices the port state change.
+
+
+==========================================================================
+STEP 1: the flow table is empty, so the switch drops everything
+==========================================================================
+  s1 has no rules and no controller.  Its fail mode is "secure", which
+  means unmatched packets are dropped instead of being forwarded.
+  The client will ask for the VIP and get nothing back.
+  --- OpenFlow rules currently in s1 (expected to be empty) ---
+  pass? phase         rule-> served        time   what that time measures
+  FAIL  no-rules      -      -        2504.8 ms   gave up after the 2.5 s client timeout: nothing came back (broken path or hung server)
+  -> no answer, exactly as expected: without rules there is no service.
+
+==========================================================================
+STEP 2: install the forwarding rules, traffic starts to flow
+==========================================================================
+  Two kinds of rule are added:
+    * one per host, so replies reach it by MAC address
+    * one that floods ARP, so hosts can find each other
+  Then the important one: VIP traffic is sent to h2.
+  pass? phase         rule-> served        time   what that time measures
+  OK    baseline      h2     h2          7.6 ms   completed: TCP connect + 13 byte body
+  --- OpenFlow rules currently in s1 (after one request: the VIP rule has forwarded packets) ---
+  how to read a rule line - these numbers belong to the SWITCH, not to
+  any request:
+    cookie=0x0         tag Open vSwitch stamps on every rule; unused here
+    duration=x.xxxs    how many seconds this rule has existed inside the
+                       switch.  It is the AGE of the rule, never the time
+                       a request took.
+    n_packets n_bytes  packets and bytes this rule has matched since it was
+                       installed - the proof that the switch is using it
+    priority=N         when several rules match one packet, the highest
+                       priority wins
+    actions=...        what the switch does: set_field rewrites a header
+                       field, output:N sends the packet out port N
+                       (on s1: h1=1, h2=2, h3=3, h4=4)
+     cookie=0x0, duration=1.013s, table=0, n_packets=6, n_bytes=481, priority=100,ip,nw_dst=10.0.0.100 actions=set_field:00:00:00:00:00:11->eth_dst,output:2
+     cookie=0x0, duration=1.192s, table=0, n_packets=7, n_bytes=669, priority=50,dl_dst=00:00:00:00:00:01 actions=output:1
+     cookie=0x0, duration=1.158s, table=0, n_packets=1, n_bytes=42, priority=50,dl_dst=00:00:00:00:00:11 actions=output:2
+     cookie=0x0, duration=1.128s, table=0, n_packets=0, n_bytes=0, priority=50,dl_dst=00:00:00:00:00:12 actions=output:3
+     cookie=0x0, duration=1.101s, table=0, n_packets=0, n_bytes=0, priority=50,dl_dst=00:00:00:00:00:13 actions=output:4
+     cookie=0x0, duration=1.071s, table=0, n_packets=1, n_bytes=42, priority=10,arp actions=FLOOD
+
+==========================================================================
+STEP 3: monitor the servers with a health check
+==========================================================================
+  From h1 we open a plain TCP connection to each server's own address
+  (10.0.0.11, 10.0.0.12, 10.0.0.13 - not the VIP).  A server that
+  answers is healthy, and its connect time is a latency sample we can
+  use for selection.  The VIP rule plays no part in this at all.
+  --- health check (baseline: all three servers should be UP) ---
+     server address     state  probe time   what that probe time means
+     h2     10.0.0.11   UP         0.9 ms   answered: TCP connect completed
+     h3     10.0.0.12   UP         0.8 ms   answered: TCP connect completed
+     h4     10.0.0.13   UP         0.8 ms   answered: TCP connect completed
+
+==========================================================================
+STEP 4: select the server from health + latency, not round-robin
+==========================================================================
+  Policy: only healthy servers are candidates, and among them the one
+  with the lowest measured latency is chosen.  Each round probes,
+  decides, re-points the VIP rule, then sends one request, so the
+  reason for the choice is printed before the traffic moves.
+  (The three virtual links are identical, so their latencies differ
+  only by noise and the same server tends to win again and again.
+  That is the correct result for this policy; step 5 keeps the
+  round-robin pass precisely to show traffic can be spread too.)
+  --- health check (before request 1 of 6) ---
+     server address     state  probe time   what that probe time means
+     h2     10.0.0.11   UP         0.2 ms   answered: TCP connect completed
+     h3     10.0.0.12   UP         0.1 ms   answered: TCP connect completed
+     h4     10.0.0.13   UP         0.1 ms   answered: TCP connect completed
+  decision: healthy=h2,h3,h4, lowest latency=h4 -> VIP -> h4
+  pass? phase         rule-> served        time   what that time measures
+  OK    smart         h4     h4          6.4 ms   completed: TCP connect + 13 byte body
+  --- health check (before request 2 of 6) ---
+     server address     state  probe time   what that probe time means
+     h2     10.0.0.11   UP         0.2 ms   answered: TCP connect completed
+     h3     10.0.0.12   UP         0.1 ms   answered: TCP connect completed
+     h4     10.0.0.13   UP         0.1 ms   answered: TCP connect completed
+  decision: healthy=h2,h3,h4, lowest latency=h3 -> VIP -> h3
+  OK    smart         h3     h3          6.2 ms   completed: TCP connect + 13 byte body
+  --- health check (before request 3 of 6) ---
+     server address     state  probe time   what that probe time means
+     h2     10.0.0.11   UP         0.2 ms   answered: TCP connect completed
+     h3     10.0.0.12   UP         0.1 ms   answered: TCP connect completed
+     h4     10.0.0.13   UP         0.1 ms   answered: TCP connect completed
+  decision: healthy=h2,h3,h4, lowest latency=h3 -> VIP -> h3
+  OK    smart         h3     h3          1.6 ms   completed: TCP connect + 13 byte body
+  --- health check (before request 4 of 6) ---
+     server address     state  probe time   what that probe time means
+     h2     10.0.0.11   UP         0.3 ms   answered: TCP connect completed
+     h3     10.0.0.12   UP         0.2 ms   answered: TCP connect completed
+     h4     10.0.0.13   UP         0.2 ms   answered: TCP connect completed
+  decision: healthy=h2,h3,h4, lowest latency=h4 -> VIP -> h4
+  OK    smart         h4     h4          2.1 ms   completed: TCP connect + 13 byte body
+  --- health check (before request 5 of 6) ---
+     server address     state  probe time   what that probe time means
+     h2     10.0.0.11   UP         0.2 ms   answered: TCP connect completed
+     h3     10.0.0.12   UP         0.2 ms   answered: TCP connect completed
+     h4     10.0.0.13   UP         0.2 ms   answered: TCP connect completed
+  decision: healthy=h2,h3,h4, lowest latency=h3 -> VIP -> h3
+  OK    smart         h3     h3          1.8 ms   completed: TCP connect + 13 byte body
+  --- health check (before request 6 of 6) ---
+     server address     state  probe time   what that probe time means
+     h2     10.0.0.11   UP         0.2 ms   answered: TCP connect completed
+     h3     10.0.0.12   UP         0.1 ms   answered: TCP connect completed
+     h4     10.0.0.13   UP         0.2 ms   answered: TCP connect completed
+  decision: healthy=h2,h3,h4, lowest latency=h3 -> VIP -> h3
+  OK    smart         h3     h3          2.1 ms   completed: TCP connect + 13 byte body
+  --- OpenFlow rules currently in s1 (after latency-based selection) ---
+     cookie=0x0, duration=1.008s, table=0, n_packets=6, n_bytes=481, priority=100,ip,nw_dst=10.0.0.100 actions=set_field:00:00:00:00:00:12->eth_dst,output:3
+     cookie=0x0, duration=2.589s, table=0, n_packets=94, n_bytes=7737, priority=50,dl_dst=00:00:00:00:00:01 actions=output:1
+     cookie=0x0, duration=2.555s, table=0, n_packets=30, n_bytes=2012, priority=50,dl_dst=00:00:00:00:00:11 actions=output:2
+     cookie=0x0, duration=2.525s, table=0, n_packets=28, n_bytes=1904, priority=50,dl_dst=00:00:00:00:00:12 actions=output:3
+     cookie=0x0, duration=2.498s, table=0, n_packets=28, n_bytes=1904, priority=50,dl_dst=00:00:00:00:00:13 actions=output:4
+     cookie=0x0, duration=2.468s, table=0, n_packets=4, n_bytes=168, priority=10,arp actions=FLOOD
+
+==========================================================================
+STEP 5: load distribution over the three servers (round-robin baseline)
+==========================================================================
+  Before each request the VIP rule is re-pointed at the next server, so
+  the traffic really goes h2, h3, h4, h2, h3, h4 ...  The client always
+  asks for the same VIP; only the switch rule changes.
+  pass? phase         rule-> served        time   what that time measures
+  OK    distribution  h2     h2          1.8 ms   completed: TCP connect + 13 byte body
+  OK    distribution  h3     h3          1.5 ms   completed: TCP connect + 13 byte body
+  OK    distribution  h4     h4          1.9 ms   completed: TCP connect + 13 byte body
+  OK    distribution  h2     h2          1.5 ms   completed: TCP connect + 13 byte body
+  OK    distribution  h3     h3          1.7 ms   completed: TCP connect + 13 byte body
+  OK    distribution  h4     h4          1.9 ms   completed: TCP connect + 13 byte body
+  OK    distribution  h2     h2          1.7 ms   completed: TCP connect + 13 byte body
+  OK    distribution  h3     h3          1.6 ms   completed: TCP connect + 13 byte body
+  OK    distribution  h4     h4          1.8 ms   completed: TCP connect + 13 byte body
+  --- OpenFlow rules currently in s1 (after distribution) ---
+     cookie=0x0, duration=1.009s, table=0, n_packets=6, n_bytes=481, priority=100,ip,nw_dst=10.0.0.100 actions=set_field:00:00:00:00:00:13->eth_dst,output:4
+     cookie=0x0, duration=4.147s, table=0, n_packets=148, n_bytes=13164, priority=50,dl_dst=00:00:00:00:00:01 actions=output:1
+     cookie=0x0, duration=4.113s, table=0, n_packets=30, n_bytes=2012, priority=50,dl_dst=00:00:00:00:00:11 actions=output:2
+     cookie=0x0, duration=4.083s, table=0, n_packets=28, n_bytes=1904, priority=50,dl_dst=00:00:00:00:00:12 actions=output:3
+     cookie=0x0, duration=4.056s, table=0, n_packets=28, n_bytes=1904, priority=50,dl_dst=00:00:00:00:00:13 actions=output:4
+     cookie=0x0, duration=4.026s, table=0, n_packets=4, n_bytes=168, priority=10,arp actions=FLOOD
+
+==========================================================================
+STEP 6: throughput, one 8 MiB download per server
+==========================================================================
+  Same mechanism, bigger file: the VIP rule chooses who sends it.
+  The numbers are real bytes per second, but between virtual hosts they
+  mostly measure memory speed rather than a real network link.
+  result rule-> served  bytes received  transfer time    throughput
+  OK     h2     h2           8,388,621       20.1 ms    416.6 MB/s
+  OK     h3     h3           8,388,621       28.6 ms    293.2 MB/s
+  OK     h4     h4           8,388,621       21.3 ms    393.8 MB/s
+
+==========================================================================
+STEP 7: a path failure - unplug h3's link at the switch
+==========================================================================
+  h3's web server keeps running and its address is unchanged; only the
+  cable is pulled.  Compare the error with step 8: a broken path cannot
+  answer at all, so the request times out instead of being refused.
+  --- health check (before the failure: h3 is UP on both counts) ---
+     server address     state  probe time   what that probe time means
+     h2     10.0.0.11   UP         0.2 ms   answered: TCP connect completed
+     h3     10.0.0.12   UP         0.1 ms   answered: TCP connect completed
+     h4     10.0.0.13   UP         0.2 ms   answered: TCP connect completed
+  pass? phase         rule-> served        time   what that time measures
+  OK    path-reference h3     h3          2.9 ms   completed: TCP connect + 13 byte body
+  now pull the cable:
+  pass? phase         rule-> served        time   what that time measures
+  FAIL  path-failure  h3     -        2502.9 ms   gave up after the 2.5 s client timeout: nothing came back (broken path or hung server)
+  --- health check (h3 should be DOWN: its path is gone) ---
+     server address     state  probe time   what that probe time means
+     h2     10.0.0.11   UP         0.3 ms   answered: TCP connect completed
+     h3     10.0.0.12   DOWN     400.9 ms   no answer within the 400 ms probe timeout
+     h4     10.0.0.13   UP         0.7 ms   answered: TCP connect completed
+  the policy drops h3 and keeps serving on the other two:
+  OK    path-failure  h2     h2          1.8 ms   completed: TCP connect + 13 byte body
+  OK    path-failure  h2     h2          1.7 ms   completed: TCP connect + 13 byte body
+  OK    path-failure  h2     h2          2.0 ms   completed: TCP connect + 13 byte body
+  OK    path-failure  h2     h2          1.8 ms   completed: TCP connect + 13 byte body
+  plug the cable back in:
+  --- health check (h3 should be UP again) ---
+     server address     state  probe time   what that probe time means
+     h2     10.0.0.11   UP         0.3 ms   answered: TCP connect completed
+     h3     10.0.0.12   UP         0.7 ms   answered: TCP connect completed
+     h4     10.0.0.13   UP         0.2 ms   answered: TCP connect completed
+  pass? phase         rule-> served        time   what that time measures
+  OK    path-back     h3     h3          2.0 ms   completed: TCP connect + 13 byte body
+
+==========================================================================
+STEP 8: a server failure - kill h3's web server
+==========================================================================
+  This time the path is fine and the process dies.  On purpose the VIP
+  rule is left pointing at h3, so the next request must fail: that is
+  what a dead server looks like to a user.
+  pass? phase         rule-> served        time   what that time measures
+  FAIL  failure       h3     -           0.2 ms   refused at once: the server is reachable, nothing listens on port 8080
+  -> refused, not timed out: the link is fine, the process is gone.
+  Now the health check runs.  h3 refuses the probe, so it is marked
+  DOWN.  Nothing in the code mentions h3: the exclusion comes from the
+  measurement.
+  --- health check (h3 should be DOWN) ---
+     server address     state  probe time   what that probe time means
+     h2     10.0.0.11   UP         0.2 ms   answered: TCP connect completed
+     h3     10.0.0.12   DOWN       0.1 ms   connection refused: host up, nothing listening on port 8080
+     h4     10.0.0.13   UP         0.1 ms   answered: TCP connect completed
+
+==========================================================================
+STEP 9: availability - keep serving while h3 is unhealthy
+==========================================================================
+  Requests keep arriving while h3 is dead.  Because the policy only
+  offers healthy servers, every request is served.  The client is never
+  told anything and still asks for the same VIP address.
+  pass? phase         rule-> served        time   what that time measures
+  OK    availability  h4     h4          1.8 ms   completed: TCP connect + 13 byte body
+  OK    availability  h4     h4          1.5 ms   completed: TCP connect + 13 byte body
+  OK    availability  h4     h4          1.6 ms   completed: TCP connect + 13 byte body
+  OK    availability  h4     h4          1.8 ms   completed: TCP connect + 13 byte body
+  OK    availability  h4     h4          1.4 ms   completed: TCP connect + 13 byte body
+  OK    availability  h4     h4          1.8 ms   completed: TCP connect + 13 byte body
+  --- OpenFlow rules currently in s1 (while h3 is dead the VIP rule only ever points at h2 or h4) ---
+     cookie=0x0, duration=1.015s, table=0, n_packets=6, n_bytes=481, priority=100,ip,nw_dst=10.0.0.100 actions=set_field:00:00:00:00:00:13->eth_dst,output:4
+     cookie=0x0, duration=12.529s, table=0, n_packets=721, n_bytes=25220024, priority=50,dl_dst=00:00:00:00:00:01 actions=output:1
+     cookie=0x0, duration=12.495s, table=0, n_packets=46, n_bytes=3100, priority=50,dl_dst=00:00:00:00:00:11 actions=output:2
+     cookie=0x0, duration=12.465s, table=0, n_packets=39, n_bytes=2638, priority=50,dl_dst=00:00:00:00:00:12 actions=output:3
+     cookie=0x0, duration=12.438s, table=0, n_packets=44, n_bytes=2992, priority=50,dl_dst=00:00:00:00:00:13 actions=output:4
+     cookie=0x0, duration=12.408s, table=0, n_packets=5, n_bytes=210, priority=10,arp actions=FLOOD
+
+==========================================================================
+STEP 10: recovery - restart h3 and let the policy find it again
+==========================================================================
+  h3's web server is started again.  Nothing tells the selection logic
+  about it: the next health check simply sees h3 answering, so h3 is a
+  candidate again and is chosen like any other server.
+  --- health check (h3 should be UP again) ---
+     server address     state  probe time   what that probe time means
+     h2     10.0.0.11   UP         0.3 ms   answered: TCP connect completed
+     h3     10.0.0.12   UP         0.2 ms   answered: TCP connect completed
+     h4     10.0.0.13   UP         0.2 ms   answered: TCP connect completed
+  pass? phase         rule-> served        time   what that time measures
+  OK    recovery-back h3     h3          6.8 ms   completed: TCP connect + 13 byte body
+  and now six ordinary policy decisions, with h3 back in the pool:
+  pass? phase         rule-> served        time   what that time measures
+  OK    recovery      h4     h4          2.2 ms   completed: TCP connect + 13 byte body
+  OK    recovery      h4     h4          1.7 ms   completed: TCP connect + 13 byte body
+  OK    recovery      h4     h4          2.1 ms   completed: TCP connect + 13 byte body
+  OK    recovery      h4     h4          1.9 ms   completed: TCP connect + 13 byte body
+  OK    recovery      h4     h4          1.7 ms   completed: TCP connect + 13 byte body
+  OK    recovery      h4     h4          2.3 ms   completed: TCP connect + 13 byte body
+
+==========================================================================
+STEP 11: comparison - one request, five different conditions
+==========================================================================
+  Same client (h1), same VIP (10.0.0.100), same 13-byte file, same server
+  (h3).  Only h3's cable and h3's web server differ between the rows.
+  "request time" and "probe time" are defined in the header at step 0.
+
+  condition                        h3 link h3 server result served  request time probe time
+  port connected (h3 cable in)     UP      running   OK     h3           2.9 ms     0.1 ms
+  port disconnected (cable pulled) DOWN    running   FAIL   -         2502.9 ms   400.9 ms
+  port reconnected (cable back)    UP      running   OK     h3           2.0 ms     0.7 ms
+  server process killed (h3)       UP      stopped   FAIL   -            0.2 ms     0.1 ms
+  server restarted (h3)            UP      running   OK     h3           6.8 ms     0.2 ms
+
+  what DISCONNECTING THE PORT changes:
+    request time   2.9 ms -> 2502.9 ms  (+2500.0 ms, about 860x slower)
+    probe time     0.1 ms -> 400.9 ms  (hits the 400 ms probe timeout)
+    error          none -> TimeoutError
+    why            the frame stops at the switch, so no answer and no
+                   error can come back.  The 2.5 s figure is the client
+                   giving up, not h3 needing that long to reply.
+
+  what RECONNECTING THE PORT changes:
+    request time   2.0 ms again and the error is gone: the repaired path
+                   carries VIP traffic, with no change to the client.
+
+  what KILLING THE SERVER PROCESS changes (cable still in):
+    request time   2.9 ms -> 0.2 ms  - FASTER, not slower
+    error          none -> ConnectionRefusedError
+    why            the packet reaches h3 and is rejected immediately, so
+                   there is no timeout to sit through.  A refused
+                   connection and a dead path are different failures,
+                   which is why the client reports two different errors.
+
+  what RESTARTING THE SERVER PROCESS changes:
+    request time   6.8 ms again, served_by=h3: h3 is a candidate again
+                   because the next health check measured it, not because
+                   any code re-enables h3.
+
+  the one-line version for the viva:
+    port disconnected -> TimeoutError after 2503 ms (nothing comes back)
+    process killed    -> ConnectionRefusedError after 0.2 ms
+    same user experience (a failed request), completely different cause.
+
+  service-level comparison (does the client still get an answer?)
+  window                               requests  served failed   success     mean time
+  all healthy, before any failure            17      17      0      100%        2.7 ms
+  h3 port pulled, policy active               5       4      1       80%        1.8 ms
+  h3 process killed, policy active            7       6      1       86%        1.7 ms
+  after h3 recovered                          8       8      0      100%        2.6 ms
+  the failed requests in the middle windows are deliberate: the rule is
+  pointed at the broken server on purpose, to show what a user would see.
+  the policy itself never routes to an unhealthy server, which is why the
+  requests that follow each health check are all served.
+
+==========================================================================
+SUMMARY
+==========================================================================
+  mean time counts SUCCESSFUL requests only.  A 2.5 s timeout is left out
+  on purpose, otherwise one dead path would hide the real service time.
+  request time = TCP connect + body, measured inside h1 (defined at step 0).
+
+  phase           requests  succeeded  failed   success    mean time
+  no-rules               1          0       1        0%            -
+  baseline               1          1       0      100%       7.6 ms
+  smart                  6          6       0      100%       3.4 ms
+  distribution           9          9       0      100%       1.7 ms
+  throughput             3          3       0      100%      23.3 ms
+  path-reference         1          1       0      100%       2.9 ms
+  path-failure           5          4       1       80%       1.8 ms
+  path-back              1          1       0      100%       2.0 ms
+  failure                1          0       1        0%            -
+  availability           6          6       0      100%       1.7 ms
+  recovery-back          1          1       0      100%       6.8 ms
+  recovery               6          6       0      100%       2.0 ms
+
+  requests answered by each server (from the response body):
+     h2  9 request(s)
+     h3 11 request(s)
+     h4 18 request(s)
+
+  throughput per server, 8 MiB file, MB/s = 1,000,000 bytes per second:
+     host bytes received  transfer time   throughput
+     h2        8,388,621        20.1 ms   416.6 MB/s
+     h3        8,388,621        28.6 ms   293.2 MB/s
+     h4        8,388,621        21.3 ms   393.8 MB/s
+
+  independent check, from each web server's own access log:
+     h2 served  9 requests
+     h3 served 11 requests
+     h4 served 18 requests
+
+  results written to /home/<user>/smart-content-delivery/results/simple_scdn_v2_results.csv

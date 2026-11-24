@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="420" viewBox="0 0 760 420">
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <text x="80" y="28" font-family="sans-serif" font-size="18" fill="#1a202c">Mean throughput per server</text>
+  <text x="80" y="48" font-family="sans-serif" font-size="12" fill="#4a5568">4 MB transfers; the figures are virtual-Ethernet limited, compare them relatively</text>
+<line x1="80" y1="60" x2="80" y2="330" stroke="#cbd5e0"/>
+<line x1="80" y1="330" x2="730" y2="330" stroke="#cbd5e0"/>
+<rect x="153.3" y="130.1" width="70.0" height="199.9" fill="#2f855a"/>
+<text x="188.3" y="124.1" font-family="sans-serif" font-size="12" fill="#1a202c" text-anchor="middle">1146.72</text>
+<text x="188.3" y="350" font-family="sans-serif" font-size="12" fill="#4a5568" text-anchor="middle">h2</text>
+<rect x="370.0" y="80.0" width="70.0" height="250.0" fill="#2f855a"/>
+<text x="405.0" y="74.0" font-family="sans-serif" font-size="12" fill="#1a202c" text-anchor="middle">1433.92</text>
+<text x="405.0" y="350" font-family="sans-serif" font-size="12" fill="#4a5568" text-anchor="middle">h3</text>
+<rect x="586.7" y="169.6" width="70.0" height="160.4" fill="#2f855a"/>
+<text x="621.7" y="163.6" font-family="sans-serif" font-size="12" fill="#1a202c" text-anchor="middle">919.98</text>
+<text x="621.7" y="350" font-family="sans-serif" font-size="12" fill="#4a5568" text-anchor="middle">h4</text>
+<text x="80" y="48" font-family="sans-serif" font-size="12" fill="#4a5568">megabits per second</text>
+</svg>

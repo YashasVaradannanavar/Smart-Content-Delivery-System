@@ -1,0 +1,296 @@
+HOW TO RUN simple_scdn.py
+=========================
+
+Everything below is on Ubuntu (WSL2 or a normal Ubuntu machine). The project
+lives in ~/smart-content-delivery. You need sudo, because Mininet creates
+network namespaces.
+
+
+QUICK START (3 commands)
+------------------------
+    cd ~/smart-content-delivery
+    sudo python3 simple_scdn.py
+    column -s, -t results/simple_scdn_results.csv
+
+The run takes well under a minute and prints nine blocks: STEP 0 to STEP 7,
+then a SUMMARY. You need nothing else: no controller, no pip install, no venv.
+
+
+STEP 1 - OPEN A WSL/UBUNTU TERMINAL
+-----------------------------------
+  From Windows: open "Ubuntu" from the Start menu, or run
+
+      wsl.exe -d Ubuntu
+
+  Then:
+
+      cd ~/smart-content-delivery
+      ls
+
+  You should see simple_scdn.py, README.txt, howtorun.txt and results/.
+
+
+STEP 2 - CHECK THE TOOLS (once, optional but recommended)
+---------------------------------------------------------
+    python3 --version                 # 3.8 or newer
+    mn --version                      # Mininet
+    ovs-vsctl --version               # Open vSwitch, 2.x or newer
+    sudo service openvswitch-switch status
+
+If "ovs-vsctl" complains that it cannot connect to the database, start the
+service first:
+
+    sudo service openvswitch-switch start
+
+Nothing needs to be installed from pip. The script imports only the Python
+standard library plus Mininet itself.
+
+
+STEP 3 - RUN IT
+---------------
+    sudo python3 simple_scdn.py
+
+It writes results/ into the folder that contains simple_scdn.py, so the
+starting directory does not matter. Nothing else is required - no flags, no
+config file.
+
+To also keep a log of the run (handy for a report):
+
+    sudo python3 simple_scdn.py 2>&1 | tee run.log
+
+
+STEP 4 - WHAT YOU SHOULD SEE
+----------------------------
+This is a real run, trimmed to the important lines. Your timings and MB/s will
+differ; the OK/FAIL pattern and the counts should match.
+
+    ==========================================================================
+    STEP 0: build the topology
+    ==========================================================================
+      switch ports: h1=1, h2=2, h3=3, h4=4
+      h1 (client), s1 (OpenFlow 1.3 switch), h2/h3/h4 (servers) are up.
+      the client asks for 10.0.0.100, which all three servers own as a /32.
+
+    ==========================================================================
+    STEP 1: the flow table is empty, so the switch drops everything
+    ==========================================================================
+      s1 has no rules and no controller.  Its fail mode is "secure", which
+      means unmatched packets are dropped instead of being forwarded.
+      The client will ask for the VIP and get nothing back.
+      --- OpenFlow rules currently in s1 (expected to be empty) ---
+      FAIL no-rules     rule->-   served_by=-    2505.4 ms  (TimeoutError)
+      -> no answer, exactly as expected: without rules there is no service.
+
+    ==========================================================================
+    STEP 2: install the forwarding rules, traffic starts to flow
+    ==========================================================================
+      OK   baseline     rule->h2  served_by=h2     15.2 ms
+      --- OpenFlow rules currently in s1 (after one request: the VIP rule has
+          forwarded packets) ---
+         cookie=0x0, table=0, n_packets=6, n_bytes=481, priority=100,ip,nw_dst=10.0.0.100 actions=set_field:00:00:00:00:00:11->eth_dst,output:2
+         cookie=0x0, table=0, n_packets=6, n_bytes=603, priority=50,dl_dst=00:00:00:00:00:01 actions=output:1
+         cookie=0x0, table=0, n_packets=1, n_bytes=42, priority=50,dl_dst=00:00:00:00:00:11 actions=output:2
+         cookie=0x0, table=0, n_packets=0, n_bytes=0, priority=50,dl_dst=00:00:00:00:00:12 actions=output:3
+         cookie=0x0, table=0, n_packets=0, n_bytes=0, priority=50,dl_dst=00:00:00:00:00:13 actions=output:4
+         cookie=0x0, table=0, n_packets=1, n_bytes=42, priority=10,arp actions=FLOOD
+
+    ==========================================================================
+    STEP 3: load distribution over the three servers
+    ==========================================================================
+      OK   distribution rule->h2  served_by=h2      2.1 ms
+      OK   distribution rule->h3  served_by=h3      7.1 ms
+      OK   distribution rule->h4  served_by=h4      8.6 ms
+      OK   distribution rule->h2  served_by=h2      1.7 ms
+      ... (9 requests, h2/h3/h4 rotating, all OK)
+
+    ==========================================================================
+    STEP 4: throughput, one 8 MiB download per server
+    ==========================================================================
+      OK   rule->h2 served_by=h2 8388621 bytes in   20.0 ms =  418.7 MB/s
+      OK   rule->h3 served_by=h3 8388621 bytes in   32.9 ms =  255.2 MB/s
+      OK   rule->h4 served_by=h4 8388621 bytes in   18.0 ms =  465.5 MB/s
+
+    ==========================================================================
+    STEP 5: simulate a server failure by killing h3's web server
+    ==========================================================================
+      FAIL failure      rule->h3  served_by=-       0.3 ms  (ConnectionRefusedError)
+      -> the request failed, which is what a dead server looks like.
+
+    ==========================================================================
+    STEP 6: failover - change the rules so traffic avoids h3
+    ==========================================================================
+      OK   failover     rule->h2  served_by=h2      3.2 ms
+      OK   failover     rule->h4  served_by=h4      1.8 ms
+      ... (6 requests on h2/h4 only, all OK, while h3 is still dead)
+      --- OpenFlow rules currently in s1 (after failover: h3 is no longer in
+          the rotation) ---
+
+    ==========================================================================
+    STEP 7: recovery - restart h3 and put it back in the rotation
+    ==========================================================================
+      OK   recovery     rule->h3  served_by=h3      7.2 ms
+      ... (6 requests, h2/h3/h4, all OK again)
+
+    ==========================================================================
+    SUMMARY
+    ==========================================================================
+      no-rules      1 request(s),  0 succeeded, mean     0.0 ms
+      baseline      1 request(s),  1 succeeded, mean    15.2 ms
+      distribution  9 request(s),  9 succeeded, mean     3.1 ms
+      throughput    3 request(s),  3 succeeded, mean    23.6 ms
+      failure       1 request(s),  0 succeeded, mean     0.0 ms
+      failover      6 request(s),  6 succeeded, mean     1.9 ms
+      recovery      6 request(s),  6 succeeded, mean     2.5 ms
+
+      requests answered by each server:
+         h2 10
+         h3  6
+         h4  9
+
+      throughput:
+         h2  418.7 MB/s  (8388621 bytes)
+         h3  255.2 MB/s  (8388621 bytes)
+         h4  465.5 MB/s  (8388621 bytes)
+
+      independent check, from each web server's own access log:
+         h2 served 10 requests
+         h3 served  6 requests
+         h4 served  9 requests
+
+      results written to /home/<user>/smart-content-delivery/results/simple_scdn_results.csv
+
+The last part is the strongest evidence in the demo: the summary computed by
+the script and the counts taken from each server's own log agree exactly.
+
+
+STEP 5 - READ THE RESULTS FILE
+------------------------------
+    cat results/simple_scdn_results.csv
+    column -s, -t results/simple_scdn_results.csv      # aligned columns
+
+Real output, first lines:
+
+    phase,expected_server,served_by,ok,latency_ms,bytes,throughput_mbps,error
+    no-rules,-,,False,2505.44,0,,TimeoutError
+    baseline,h2,h2,True,15.25,13,,
+    distribution,h2,h2,True,2.07,13,,
+    distribution,h3,h3,True,7.11,13,,
+    ...
+    throughput,h2,h2,True,20.04,8388621,418.66,
+    failure,h3,,False,0.31,0,,ConnectionRefusedError
+    failover,h2,h2,True,3.24,13,,
+    ...
+
+Columns: phase, expected_server (where the rule pointed), served_by (who really
+answered), ok, latency_ms, bytes, throughput_mbps, error.
+Open it in Excel or LibreOffice for a chart; the file is rewritten on every run.
+
+
+STEP 6 - WATCH THE SWITCH YOURSELF (optional, nice during a demo)
+-----------------------------------------------------------------
+The switch only exists while the script runs, so open two terminals:
+
+  Terminal 1:
+      sudo python3 simple_scdn.py
+
+  Terminal 2 (while step 3/6 is running):
+      sudo ovs-ofctl -O OpenFlow13 dump-flows s1
+      sudo ovs-ofctl -O OpenFlow13 show s1
+
+Every time the VIP rule is re-pointed you will see the set_field MAC and the
+output port change, and n_packets on that rule keep growing. Ctrl-C in terminal
+1 ends the demo; the script tears the network down itself.
+
+Note: Open vSwitch refreshes counters about once a second, so a rule used a
+moment ago can still read n_packets=0 for a fraction of a second.
+
+
+STEP 7 - RUN IT AGAIN / CLEAN UP
+--------------------------------
+Just run it again - it deletes the old switch and interfaces at startup:
+
+    sudo python3 simple_scdn.py
+
+If you interrupted a run and want to be sure nothing is left:
+
+    sudo ovs-vsctl --if-exists del-br s1
+    sudo mn -c                    # Mininet's own cleanup
+
+Check it is clean:
+
+    sudo ovs-vsctl show            # s1 should be gone
+    ip -br link | grep -E 's1-eth|h[1-4]-eth0'   # no output
+
+
+STEP 8 - RUN IT FROM WINDOWS WITHOUT ENTERING WSL
+-------------------------------------------------
+    wsl.exe -u root -d Ubuntu -- bash -lc "cd /home/<user>/smart-content-delivery && python3 simple_scdn.py"
+
+Then open results/simple_scdn_results.csv from Windows Explorer at
+\\wsl.localhost\Ubuntu\home\<user>\smart-content-delivery\results\
+
+
+TROUBLESHOOTING
+---------------
+  "Mininet needs root.  Run:  sudo python3 simple_scdn.py"
+      You forgot sudo. The script exits with an error on purpose.
+
+  "required program not found: ovs-ofctl" (or mn, ovs-vsctl)
+      Open vSwitch or Mininet is not installed/visible in PATH:
+          sudo apt install mininet openvswitch-switch
+
+  ovs-vsctl: database connection failed
+      The OVS service is not running:
+          sudo service openvswitch-switch start
+
+  "the web server on h3 did not start" / port 8080 already in use
+      Something else is listening on 8080 inside the namespace, usually a
+      leftover server from an interrupted run. Clean up and retry:
+          sudo mn -c
+      To use another port, change HTTP_PORT at the top of simple_scdn.py.
+
+  "switch port for hX (s1-ethN) not found"
+      An old bridge s1 was still there when the script started. It cleans up
+      automatically, but if it persists:
+          sudo ovs-vsctl --if-exists del-br s1 && sudo mn -c
+
+  Everything FAILs in step 2 as well (not just step 1)
+      The rules are not reaching the switch. Check, in a second terminal:
+          sudo ovs-ofctl -O OpenFlow13 dump-flows s1
+      If it is empty, ovs-ofctl could not connect - see the OVS service note
+      above. Also make sure you did not edit MAC addresses in the file.
+
+  Timings look odd / MB/s very low
+      The first request after a rule change is slower, and throughput between
+      virtual hosts mostly measures memory speed. Run it on an idle machine,
+      and ignore absolute MB/s in a report; report the change instead.
+
+  Ctrl-C during the run
+      The script still tears down the network (its finally-block runs). If the
+      terminal is killed hard, run: sudo mn -c
+
+
+SMALL KNOBS (all at the top of simple_scdn.py or in one function)
+-----------------------------------------------------------------
+  HTTP_PORT / BIG_BYTES       port and size of the throughput file
+  SERVERS / CLIENT / VIP      addressing plan (if you change MACs, change all)
+  phase_distribution()        range(9)  -> number of distribution requests
+  phase_failover()            range(6)  -> number of failover requests
+  phase_recovery()            range(6)  -> number of recovery requests
+  phase_failure()             'h3'      -> which server is killed
+
+After editing, rerun. There is no other configuration to keep in sync.
+
+
+DEMO SCRIPT FOR A 3-MINUTE PRESENTATION
+---------------------------------------
+  1. Show the topology diagram in README.txt section 2, and the six rules in
+     section 4.
+  2. "The client only knows one address, the VIP. The switch decides which
+     server answers. Watch the rule change." Run the script.
+  3. Point at STEP 1: no rules -> nothing works. Rules matter.
+  4. Point at STEP 3: the rule->h2/h3/h4 column and the served_by column move
+     together. That is the switch doing it, not the client.
+  5. Point at STEP 5/6: the FAIL row, then all OK rows while h3 is still dead.
+  6. Point at STEP 7 and at the summary's access-log cross-check.
+  7. Open the CSV and show the same data as a table.

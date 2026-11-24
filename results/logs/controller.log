@@ -1,0 +1,175 @@
+2026-10-22 15:11:37,982 INFO    controller: OpenFlow listener bound to 0.0.0.0:6653
+2026-10-22 15:11:37,989 INFO    controller: control API listening on 127.0.0.1:9100
+2026-10-22 15:11:37,990 INFO    controller: startup: controller listening on port 6653
+2026-10-22 15:11:38,618 INFO    controller: switch_connect: switch channel opened from 127.0.0.1:43124
+2026-10-22 15:11:38,619 WARNING controller: switch connection ('127.0.0.1', 43124) closed
+2026-10-22 15:11:39,160 INFO    controller: switch_connect: switch channel opened from 127.0.0.1:58730
+2026-10-22 15:11:39,167 INFO    controller: port status change (reason=2)
+2026-10-22 15:11:39,167 INFO    controller: switch connected: dpid=0x0000000000000001 buffers=0 tables=254 (('127.0.0.1', 58730))
+2026-10-22 15:11:39,168 INFO    controller: base_rules: installed ARP-to-controller, VIP-to-controller and table-miss drop
+2026-10-22 15:11:40,080 INFO    controller: ports: learned switch port map
+2026-10-22 15:11:40,805 INFO    controller: selection: initial selection: h4 has the lowest load (0 active, 2.84 ms)
+2026-10-22 15:11:41,006 INFO    controller: selection: initial selection: h2 has the lowest load (0 active, 3.79 ms)
+2026-10-22 15:11:41,162 INFO    controller: selection: initial selection: h3 has the lowest load (0 active, 3.38 ms)
+2026-10-22 15:11:41,164 INFO    controller: selection: keep h3 for source port 39084: connection already steered
+2026-10-22 15:11:41,165 INFO    controller: selection: keep h3 for source port 39084: connection already steered
+2026-10-22 15:11:41,362 INFO    controller: selection: initial selection: h4 has the lowest load (0 active, 2.84 ms)
+2026-10-22 15:11:41,366 INFO    controller: selection: keep h4 for source port 39094: connection already steered
+2026-10-22 15:11:41,367 INFO    controller: selection: keep h4 for source port 39094: connection already steered
+2026-10-22 15:11:41,564 INFO    controller: selection: initial selection: h2 has the lowest load (0 active, 2.33 ms)
+2026-10-22 15:11:41,565 INFO    controller: selection: keep h2 for source port 39096: connection already steered
+2026-10-22 15:11:41,566 INFO    controller: selection: keep h2 for source port 39096: connection already steered
+2026-10-22 15:11:41,766 INFO    controller: selection: initial selection: h3 has the lowest load (0 active, 2.02 ms)
+2026-10-22 15:11:41,767 INFO    controller: selection: keep h3 for source port 39112: connection already steered
+2026-10-22 15:11:41,768 INFO    controller: selection: keep h3 for source port 39112: connection already steered
+2026-10-22 15:11:41,967 INFO    controller: selection: initial selection: h2 has the lowest load (1 active, 2.33 ms)
+2026-10-22 15:11:41,969 INFO    controller: selection: keep h2 for source port 39114: connection already steered
+2026-10-22 15:11:41,969 INFO    controller: selection: keep h2 for source port 39114: connection already steered
+2026-10-22 15:11:42,170 INFO    controller: selection: initial selection: h2 has the lowest load (1 active, 2.33 ms)
+2026-10-22 15:11:42,172 INFO    controller: selection: keep h2 for source port 39120: connection already steered
+2026-10-22 15:11:42,172 INFO    controller: selection: keep h2 for source port 39120: connection already steered
+2026-10-22 15:11:42,372 INFO    controller: selection: initial selection: h3 has the lowest load (0 active, 2.02 ms)
+2026-10-22 15:11:42,526 INFO    controller: selection: initial selection: h2 has the lowest load (1 active, 2.33 ms)
+2026-10-22 15:11:42,528 INFO    controller: selection: keep h2 for source port 39136: connection already steered
+2026-10-22 15:11:42,528 INFO    controller: selection: keep h2 for source port 39136: connection already steered
+2026-10-22 15:11:42,728 INFO    controller: selection: initial selection: h4 has the lowest load (0 active, 1.42 ms)
+2026-10-22 15:11:42,730 INFO    controller: selection: keep h4 for source port 39142: connection already steered
+2026-10-22 15:11:42,730 INFO    controller: selection: keep h4 for source port 39142: connection already steered
+2026-10-22 15:11:42,925 INFO    controller: selection: initial selection: h3 has the lowest load (0 active, 1.69 ms)
+2026-10-22 15:11:42,927 INFO    controller: selection: keep h3 for source port 39146: connection already steered
+2026-10-22 15:11:43,081 INFO    controller: selection: initial selection: h2 has the lowest load (0 active, 2.27 ms)
+2026-10-22 15:11:43,083 INFO    controller: selection: keep h2 for source port 39154: connection already steered
+2026-10-22 15:11:43,083 INFO    controller: selection: keep h2 for source port 39154: connection already steered
+2026-10-22 15:11:43,277 INFO    controller: selection: initial selection: h4 has the lowest load (0 active, 1.42 ms)
+2026-10-22 15:11:43,278 INFO    controller: selection: keep h4 for source port 39166: connection already steered
+2026-10-22 15:11:43,433 INFO    controller: selection: initial selection: h3 has the lowest load (0 active, 1.69 ms)
+2026-10-22 15:11:43,435 INFO    controller: selection: keep h3 for source port 39176: connection already steered
+2026-10-22 15:11:43,436 INFO    controller: selection: keep h3 for source port 39176: connection already steered
+2026-10-22 15:11:43,637 INFO    controller: selection: initial selection: h2 has the lowest load (0 active, 1.94 ms)
+2026-10-22 15:11:43,638 INFO    controller: selection: keep h2 for source port 39178: connection already steered
+2026-10-22 15:11:43,639 INFO    controller: selection: keep h2 for source port 39178: connection already steered
+2026-10-22 15:11:43,833 INFO    controller: selection: initial selection: h4 has the lowest load (0 active, 1.65 ms)
+2026-10-22 15:11:43,835 INFO    controller: selection: keep h4 for source port 39190: connection already steered
+2026-10-22 15:11:43,836 INFO    controller: selection: keep h4 for source port 39190: connection already steered
+2026-10-22 15:11:44,030 INFO    controller: selection: initial selection: h2 has the lowest load (1 active, 1.94 ms)
+2026-10-22 15:11:44,033 INFO    controller: selection: keep h2 for source port 39194: connection already steered
+2026-10-22 15:11:44,033 INFO    controller: selection: keep h2 for source port 39194: connection already steered
+2026-10-22 15:11:44,230 INFO    controller: selection: initial selection: h2 has the lowest load (1 active, 1.94 ms)
+2026-10-22 15:11:44,231 INFO    controller: selection: keep h2 for source port 39196: connection already steered
+2026-10-22 15:11:44,232 INFO    controller: selection: keep h2 for source port 39196: connection already steered
+2026-10-22 15:11:44,440 INFO    controller: selection: initial selection: h4 has the lowest load (0 active, 1.65 ms)
+2026-10-22 15:11:44,442 INFO    controller: selection: keep h4 for source port 39204: connection already steered
+2026-10-22 15:11:44,442 INFO    controller: selection: keep h4 for source port 39204: connection already steered
+2026-10-22 15:11:44,960 INFO    controller: selection: initial selection: h2 has the lowest load (0 active, 2.38 ms)
+2026-10-22 15:11:44,961 INFO    controller: selection: initial selection: h3 has the lowest load (0 active, 2.20 ms)
+2026-10-22 15:11:44,962 INFO    controller: selection: initial selection: h2 has the lowest load (1 active, 2.38 ms)
+2026-10-22 15:11:44,962 INFO    controller: selection: keep h2 for source port 39214: connection already steered
+2026-10-22 15:11:44,963 INFO    controller: selection: keep h2 for source port 39214: connection already steered
+2026-10-22 15:11:45,115 INFO    controller: selection: initial selection: h3 has the lowest load (1 active, 2.20 ms)
+2026-10-22 15:11:45,117 INFO    controller: selection: keep h3 for source port 39236: connection already steered
+2026-10-22 15:11:45,117 INFO    controller: selection: keep h3 for source port 39236: connection already steered
+2026-10-22 15:11:45,162 INFO    controller: selection: initial selection: h4 has the lowest load (1 active, 2.21 ms)
+2026-10-22 15:11:45,164 INFO    controller: selection: initial selection: h4 has the lowest load (1 active, 2.21 ms)
+2026-10-22 15:11:45,164 INFO    controller: selection: keep h4 for source port 39252: connection already steered
+2026-10-22 15:11:45,165 INFO    controller: selection: keep h4 for source port 39254: connection already steered
+2026-10-22 15:11:45,166 INFO    controller: selection: keep h4 for source port 39254: connection already steered
+2026-10-22 15:11:45,312 INFO    controller: selection: initial selection: h2 has the lowest load (2 active, 2.38 ms)
+2026-10-22 15:11:45,313 INFO    controller: selection: keep h2 for source port 39266: connection already steered
+2026-10-22 15:11:45,318 INFO    controller: selection: initial selection: h3 has the lowest load (2 active, 2.20 ms)
+2026-10-22 15:11:45,362 INFO    controller: selection: keep h3 for source port 39274: connection already steered
+2026-10-22 15:11:45,363 INFO    controller: selection: keep h3 for source port 39274: connection already steered
+2026-10-22 15:11:45,363 INFO    controller: selection: initial selection: h4 has the lowest load (2 active, 2.21 ms)
+2026-10-22 15:11:45,406 INFO    controller: selection: keep h4 for source port 39288: connection already steered
+2026-10-22 15:11:45,406 INFO    controller: selection: keep h4 for source port 39288: connection already steered
+2026-10-22 15:11:45,469 INFO    controller: selection: initial selection: h2 has the lowest load (1 active, 2.38 ms)
+2026-10-22 15:11:45,560 INFO    controller: selection: initial selection: h2 has the lowest load (2 active, 2.38 ms)
+2026-10-22 15:11:45,561 INFO    controller: selection: keep h2 for source port 39312: connection already steered
+2026-10-22 15:11:45,562 INFO    controller: selection: keep h2 for source port 39312: connection already steered
+2026-10-22 15:11:45,601 INFO    controller: selection: initial selection: h3 has the lowest load (2 active, 3.82 ms)
+2026-10-22 15:11:45,645 INFO    controller: selection: keep h3 for source port 39326: connection already steered
+2026-10-22 15:11:45,646 INFO    controller: selection: keep h3 for source port 39326: connection already steered
+2026-10-22 15:11:46,150 INFO    controller: selection: initial selection: h3 has the lowest load (0 active, 3.82 ms)
+2026-10-22 15:11:46,152 INFO    controller: selection: keep h3 for source port 39332: connection already steered
+2026-10-22 15:11:46,153 INFO    controller: selection: keep h3 for source port 39332: connection already steered
+2026-10-22 15:11:46,393 INFO    controller: selection: initial selection: h2 has the lowest load (1 active, 2.33 ms)
+2026-10-22 15:11:46,395 INFO    controller: selection: keep h2 for source port 39338: connection already steered
+2026-10-22 15:11:46,396 INFO    controller: selection: keep h2 for source port 39338: connection already steered
+2026-10-22 15:11:46,615 INFO    controller: selection: initial selection: h4 has the lowest load (0 active, 1.39 ms)
+2026-10-22 15:11:46,617 INFO    controller: selection: keep h4 for source port 39348: connection already steered
+2026-10-22 15:11:46,617 INFO    controller: selection: keep h4 for source port 39348: connection already steered
+2026-10-22 15:11:46,856 INFO    controller: selection: initial selection: h3 has the lowest load (0 active, 2.06 ms)
+2026-10-22 15:11:46,858 INFO    controller: selection: keep h3 for source port 39364: connection already steered
+2026-10-22 15:11:46,861 INFO    controller: selection: keep h3 for source port 39364: connection already steered
+2026-10-22 15:11:47,041 INFO    controller: selection: initial selection: h2 has the lowest load (1 active, 2.01 ms)
+2026-10-22 15:11:47,042 INFO    controller: selection: keep h2 for source port 39378: connection already steered
+2026-10-22 15:11:47,043 INFO    controller: selection: keep h2 for source port 39378: connection already steered
+2026-10-22 15:11:48,583 WARNING monitor: server h2 is DOWN (URLError: <urlopen error [Errno 111] Connection refused>)
+2026-10-22 15:11:48,584 INFO    controller: server_down: server h2 (10.0.0.11) is DOWN
+2026-10-22 15:11:48,585 INFO    controller: flow_delete: removed all flows pointing at server index 1
+2026-10-22 15:11:48,585 INFO    controller: failover: server h2 removed from the pool; new connections will use a healthy server
+2026-10-22 15:11:48,898 INFO    controller: selection: initial selection: h3 has the lowest load (0 active, 2.37 ms)
+2026-10-22 15:11:49,094 INFO    controller: selection: initial selection: h4 has the lowest load (0 active, 2.25 ms)
+2026-10-22 15:11:49,096 INFO    controller: selection: keep h4 for source port 36870: connection already steered
+2026-10-22 15:11:49,096 INFO    controller: selection: keep h4 for source port 36870: connection already steered
+2026-10-22 15:11:49,290 INFO    controller: selection: initial selection: h3 has the lowest load (1 active, 2.37 ms)
+2026-10-22 15:11:49,291 INFO    controller: selection: keep h3 for source port 36880: connection already steered
+2026-10-22 15:11:49,292 INFO    controller: selection: keep h3 for source port 36880: connection already steered
+2026-10-22 15:11:49,488 INFO    controller: selection: initial selection: h3 has the lowest load (1 active, 2.37 ms)
+2026-10-22 15:11:49,489 INFO    controller: selection: keep h3 for source port 36888: connection already steered
+2026-10-22 15:11:49,489 INFO    controller: selection: keep h3 for source port 36888: connection already steered
+2026-10-22 15:11:49,685 INFO    controller: selection: initial selection: h4 has the lowest load (0 active, 2.45 ms)
+2026-10-22 15:11:49,687 INFO    controller: selection: keep h4 for source port 36902: connection already steered
+2026-10-22 15:11:49,690 INFO    controller: selection: keep h4 for source port 36902: connection already steered
+2026-10-22 15:11:49,885 INFO    controller: selection: initial selection: h4 has the lowest load (1 active, 2.45 ms)
+2026-10-22 15:11:49,887 INFO    controller: selection: keep h4 for source port 36912: connection already steered
+2026-10-22 15:11:49,887 INFO    controller: selection: keep h4 for source port 36912: connection already steered
+2026-10-22 15:11:50,091 INFO    controller: selection: initial selection: h3 has the lowest load (1 active, 8.66 ms)
+2026-10-22 15:11:50,092 INFO    controller: selection: keep h3 for source port 36920: connection already steered
+2026-10-22 15:11:50,093 INFO    controller: selection: keep h3 for source port 36920: connection already steered
+2026-10-22 15:11:50,290 INFO    controller: selection: initial selection: h4 has the lowest load (1 active, 2.45 ms)
+2026-10-22 15:11:50,291 INFO    controller: selection: keep h4 for source port 36936: connection already steered
+2026-10-22 15:11:50,292 INFO    controller: selection: keep h4 for source port 36936: connection already steered
+2026-10-22 15:11:50,491 INFO    controller: selection: initial selection: h4 has the lowest load (1 active, 2.45 ms)
+2026-10-22 15:11:50,492 INFO    controller: selection: keep h4 for source port 36938: connection already steered
+2026-10-22 15:11:50,493 INFO    controller: selection: keep h4 for source port 36938: connection already steered
+2026-10-22 15:11:50,690 INFO    controller: selection: initial selection: h3 has the lowest load (0 active, 2.44 ms)
+2026-10-22 15:11:50,692 INFO    controller: selection: keep h3 for source port 36952: connection already steered
+2026-10-22 15:11:50,692 INFO    controller: selection: keep h3 for source port 36952: connection already steered
+2026-10-22 15:11:51,611 WARNING monitor: server h2 is UP (ok)
+2026-10-22 15:11:51,611 INFO    controller: server_up: server h2 (10.0.0.11) is UP
+2026-10-22 15:11:52,009 INFO    controller: selection: initial selection: h3 has the lowest load (0 active, 2.16 ms)
+2026-10-22 15:11:52,010 INFO    controller: selection: keep h3 for source port 36958: connection already steered
+2026-10-22 15:11:52,011 INFO    controller: selection: keep h3 for source port 36958: connection already steered
+2026-10-22 15:11:52,207 INFO    controller: selection: initial selection: h4 has the lowest load (0 active, 2.95 ms)
+2026-10-22 15:11:52,208 INFO    controller: selection: keep h4 for source port 36962: connection already steered
+2026-10-22 15:11:52,208 INFO    controller: selection: keep h4 for source port 36962: connection already steered
+2026-10-22 15:11:52,406 INFO    controller: selection: initial selection: h2 has the lowest load (0 active, 3.12 ms)
+2026-10-22 15:11:52,408 INFO    controller: selection: keep h2 for source port 36970: connection already steered
+2026-10-22 15:11:52,408 INFO    controller: selection: keep h2 for source port 36970: connection already steered
+2026-10-22 15:11:52,602 INFO    controller: selection: initial selection: h3 has the lowest load (0 active, 2.16 ms)
+2026-10-22 15:11:52,603 INFO    controller: selection: keep h3 for source port 36972: connection already steered
+2026-10-22 15:11:52,762 INFO    controller: selection: initial selection: h4 has the lowest load (0 active, 1.98 ms)
+2026-10-22 15:11:52,764 INFO    controller: selection: keep h4 for source port 36976: connection already steered
+2026-10-22 15:11:52,764 INFO    controller: selection: keep h4 for source port 36976: connection already steered
+2026-10-22 15:11:52,959 INFO    controller: selection: initial selection: h2 has the lowest load (0 active, 2.93 ms)
+2026-10-22 15:11:52,960 INFO    controller: selection: keep h2 for source port 36988: connection already steered
+2026-10-22 15:11:53,118 INFO    controller: selection: initial selection: h2 has the lowest load (1 active, 2.93 ms)
+2026-10-22 15:11:53,120 INFO    controller: selection: keep h2 for source port 36998: connection already steered
+2026-10-22 15:11:53,120 INFO    controller: selection: keep h2 for source port 36998: connection already steered
+2026-10-22 15:11:53,318 INFO    controller: selection: initial selection: h4 has the lowest load (0 active, 1.98 ms)
+2026-10-22 15:11:53,320 INFO    controller: selection: keep h4 for source port 37010: connection already steered
+2026-10-22 15:11:53,321 INFO    controller: selection: keep h4 for source port 37010: connection already steered
+2026-10-22 15:11:53,518 INFO    controller: selection: initial selection: h2 has the lowest load (1 active, 2.93 ms)
+2026-10-22 15:11:53,520 INFO    controller: selection: keep h2 for source port 37024: connection already steered
+2026-10-22 15:11:53,520 INFO    controller: selection: keep h2 for source port 37024: connection already steered
+2026-10-22 15:11:53,718 INFO    controller: selection: initial selection: h3 has the lowest load (0 active, 2.18 ms)
+2026-10-22 15:11:53,720 INFO    controller: selection: keep h3 for source port 37038: connection already steered
+2026-10-22 15:11:54,076 INFO    controller: port status change (reason=2)
+2026-10-22 15:11:54,077 INFO    controller: port status change (reason=1)
+2026-10-22 15:11:54,140 INFO    controller: port status change (reason=2)
+2026-10-22 15:11:54,140 INFO    controller: port status change (reason=1)
+2026-10-22 15:11:54,186 INFO    controller: port status change (reason=2)
+2026-10-22 15:11:54,186 INFO    controller: port status change (reason=1)
+2026-10-22 15:11:54,244 INFO    controller: port status change (reason=2)
+2026-10-22 15:11:54,244 INFO    controller: port status change (reason=1)
+2026-10-22 15:11:54,363 WARNING controller: switch connection ('127.0.0.1', 58730) closed

@@ -1,0 +1,54 @@
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual environments and local interpreters
+.venv/
+venv/
+env/
+ENV/
+.python-version
+
+# Runtime state and temporary files
+state/
+*.pid
+*.tmp
+*.temp
+*.bak
+
+# Local logs. Test evidence under results/ is intentionally tracked.
+*.log
+!results/logs/*.log
+!results/simple_scdn_v2_run.log
+
+# Secrets and local credentials (never commit these)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa
+id_ed25519
+
+# Build and packaging artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Editor and OS metadata
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini

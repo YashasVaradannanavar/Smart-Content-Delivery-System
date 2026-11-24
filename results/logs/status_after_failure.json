@@ -1,0 +1,185 @@
+{
+  "controller": {
+    "uptime_s": 10.71,
+    "of_port": 6653,
+    "api_port": 9100
+  },
+  "switch": {
+    "connected": true,
+    "dpid": "0000000000000001",
+    "ports": {
+      "h1": 1,
+      "h2": 2,
+      "h3": 3,
+      "h4": 4
+    }
+  },
+  "vip": "10.0.0.100",
+  "active_host": "h2",
+  "servers": {
+    "h2": {
+      "host": "h2",
+      "ip": "10.0.0.11",
+      "healthy": false,
+      "failures": 2,
+      "rtt_ms": 2.009,
+      "active": 1,
+      "total": 14,
+      "last_error": "URLError: <urlopen error [Errno 111] Connection refused>",
+      "ever_seen": true
+    },
+    "h3": {
+      "host": "h3",
+      "ip": "10.0.0.12",
+      "healthy": true,
+      "failures": 0,
+      "rtt_ms": 2.374,
+      "active": 0,
+      "total": 11,
+      "last_error": "",
+      "ever_seen": true
+    },
+    "h4": {
+      "host": "h4",
+      "ip": "10.0.0.13",
+      "healthy": true,
+      "failures": 0,
+      "rtt_ms": 2.255,
+      "active": 0,
+      "total": 10,
+      "last_error": "",
+      "ever_seen": true
+    }
+  },
+  "decisions": [
+    {
+      "iso": "2026-10-22T15:11:46.150",
+      "time": 1792681906.15,
+      "host": "h3",
+      "ip": "10.0.0.12",
+      "reason": "initial selection: h3 has the lowest load (0 active, 3.82 ms)",
+      "source_port": 39332
+    },
+    {
+      "iso": "2026-10-22T15:11:46.152",
+      "time": 1792681906.153,
+      "host": "h3",
+      "ip": "10.0.0.12",
+      "reason": "keep h3 for source port 39332: connection already steered",
+      "source_port": 39332
+    },
+    {
+      "iso": "2026-10-22T15:11:46.153",
+      "time": 1792681906.153,
+      "host": "h3",
+      "ip": "10.0.0.12",
+      "reason": "keep h3 for source port 39332: connection already steered",
+      "source_port": 39332
+    },
+    {
+      "iso": "2026-10-22T15:11:46.393",
+      "time": 1792681906.393,
+      "host": "h2",
+      "ip": "10.0.0.11",
+      "reason": "initial selection: h2 has the lowest load (1 active, 2.33 ms)",
+      "source_port": 39338
+    },
+    {
+      "iso": "2026-10-22T15:11:46.395",
+      "time": 1792681906.395,
+      "host": "h2",
+      "ip": "10.0.0.11",
+      "reason": "keep h2 for source port 39338: connection already steered",
+      "source_port": 39338
+    },
+    {
+      "iso": "2026-10-22T15:11:46.396",
+      "time": 1792681906.397,
+      "host": "h2",
+      "ip": "10.0.0.11",
+      "reason": "keep h2 for source port 39338: connection already steered",
+      "source_port": 39338
+    },
+    {
+      "iso": "2026-10-22T15:11:46.615",
+      "time": 1792681906.616,
+      "host": "h4",
+      "ip": "10.0.0.13",
+      "reason": "initial selection: h4 has the lowest load (0 active, 1.39 ms)",
+      "source_port": 39348
+    },
+    {
+      "iso": "2026-10-22T15:11:46.616",
+      "time": 1792681906.617,
+      "host": "h4",
+      "ip": "10.0.0.13",
+      "reason": "keep h4 for source port 39348: connection already steered",
+      "source_port": 39348
+    },
+    {
+      "iso": "2026-10-22T15:11:46.617",
+      "time": 1792681906.618,
+      "host": "h4",
+      "ip": "10.0.0.13",
+      "reason": "keep h4 for source port 39348: connection already steered",
+      "source_port": 39348
+    },
+    {
+      "iso": "2026-10-22T15:11:46.855",
+      "time": 1792681906.856,
+      "host": "h3",
+      "ip": "10.0.0.12",
+      "reason": "initial selection: h3 has the lowest load (0 active, 2.06 ms)",
+      "source_port": 39364
+    },
+    {
+      "iso": "2026-10-22T15:11:46.858",
+      "time": 1792681906.858,
+      "host": "h3",
+      "ip": "10.0.0.12",
+      "reason": "keep h3 for source port 39364: connection already steered",
+      "source_port": 39364
+    },
+    {
+      "iso": "2026-10-22T15:11:46.861",
+      "time": 1792681906.861,
+      "host": "h3",
+      "ip": "10.0.0.12",
+      "reason": "keep h3 for source port 39364: connection already steered",
+      "source_port": 39364
+    },
+    {
+      "iso": "2026-10-22T15:11:47.041",
+      "time": 1792681907.041,
+      "host": "h2",
+      "ip": "10.0.0.11",
+      "reason": "initial selection: h2 has the lowest load (1 active, 2.01 ms)",
+      "source_port": 39378
+    },
+    {
+      "iso": "2026-10-22T15:11:47.042",
+      "time": 1792681907.042,
+      "host": "h2",
+      "ip": "10.0.0.11",
+      "reason": "keep h2 for source port 39378: connection already steered",
+      "source_port": 39378
+    },
+    {
+      "iso": "2026-10-22T15:11:47.043",
+      "time": 1792681907.043,
+      "host": "h2",
+      "ip": "10.0.0.11",
+      "reason": "keep h2 for source port 39378: connection already steered",
+      "source_port": 39378
+    }
+  ],
+  "last_reason": "keep h2 for source port 39378: connection already steered",
+  "counters": {
+    "packet_ins": 99,
+    "arp_replies": 4,
+    "connections_steered": 95,
+    "flows_installed": 193,
+    "flows_deleted": 1,
+    "failovers": 1
+  }
+}
